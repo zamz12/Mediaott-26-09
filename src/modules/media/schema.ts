@@ -1,0 +1,40 @@
+import { z } from "zod";
+
+export const contentMetadataSchema = z.object({
+  title: z.string().min(2).max(150),
+  synopsis: z.string().max(2000).optional(),
+  contentType: z.enum([
+    "MOVIE",
+    "DRAMA",
+    "SERIES",
+    "EPISODE",
+    "DOCUMENTARY",
+    "SHORT_FILM",
+    "AI_PRODUCTION",
+    "ANIMATION",
+    "EDUCATION",
+    "NEWS",
+    "EVENT",
+    "LIVE",
+    "PODCAST",
+    "MUSIC",
+    "COMMUNITY",
+    "GOVERNMENT",
+    "TOURISM",
+    "CULTURE",
+    "PERSONAL",
+  ]),
+  categoryId: z.string().optional(),
+  genreIds: z.array(z.string()).default([]),
+  originalLanguageId: z.string().optional(),
+  rating: z.enum(["U", "P13", "SIXTEEN", "EIGHTEEN"]),
+  releaseYear: z.coerce.number().int().min(1900).max(2100).optional(),
+  visibility: z.enum(["PUBLIC", "UNLISTED", "PRIVATE", "MEMBERS_ONLY", "ORGANISATION_ONLY", "SCHEDULED"]),
+  scheduledAt: z.string().optional(),
+  ownsContent: z.coerce.boolean(),
+  authorisedToPublish: z.coerce.boolean(),
+  isAiGenerated: z.coerce.boolean(),
+  containsPaidPromotion: z.coerce.boolean(),
+});
+
+export type ContentMetadataInput = z.infer<typeof contentMetadataSchema>;

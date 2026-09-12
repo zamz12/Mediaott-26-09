@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+/* LOKAL design tokens (Section 28). Dark cinematic is the default; LIGHT and
+   SYSTEM are supported via the [data-theme] attribute set by ThemeProvider. */
+:root {
+  --color-bg: #0b0e14; /* deep charcoal / midnight navy */
+  --color-bg-elevated: #12161f;
+  --color-bg-overlay: rgba(11, 14, 20, 0.85);
+  --color-fg: #f3f5f7;
+  --color-fg-muted: #9aa3b2;
+  --color-border: #232838;
+  --color-accent: #22d3ee; /* electric cyan */
+  --color-accent-strong: #06b6d4;
+  --color-gold: #f0b429; /* warm amber / gold */
+  --color-danger: #f87171;
+  --color-success: #34d399;
+  --radius-card: 0.75rem;
+}
+
+[data-theme="light"] {
+  --color-bg: #f7f8fa;
+  --color-bg-elevated: #ffffff;
+  --color-bg-overlay: rgba(255, 255, 255, 0.9);
+  --color-fg: #12161f;
+  --color-fg-muted: #5a6373;
+  --color-border: #e2e5eb;
+  --color-accent: #0891b2;
+  --color-accent-strong: #0e7490;
+  --color-gold: #b45309;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --color-bg: #f7f8fa;
+    --color-bg-elevated: #ffffff;
+    --color-bg-overlay: rgba(255, 255, 255, 0.9);
+    --color-fg: #12161f;
+    --color-fg-muted: #5a6373;
+    --color-border: #e2e5eb;
+    --color-accent: #0891b2;
+    --color-accent-strong: #0e7490;
+    --color-gold: #b45309;
+  }
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-fg);
+  --color-elevated: var(--color-bg-elevated);
+  --color-muted: var(--color-fg-muted);
+  --color-border: var(--color-border);
+  --color-accent: var(--color-accent);
+  --color-accent-strong: var(--color-accent-strong);
+  --color-gold: var(--color-gold);
+  --color-danger: var(--color-danger);
+  --color-success: var(--color-success);
+  --font-sans: var(--font-inter);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.rail-scroll {
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.rail-scroll > * {
+  scroll-snap-align: start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

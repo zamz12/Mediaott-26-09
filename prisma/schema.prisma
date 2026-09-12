@@ -1,0 +1,1068 @@
+// LOKAL — Malaysian OTT streaming & creator platform
+// Normalized PostgreSQL schema. UUID identifiers, soft-delete + audit columns
+// where the entity is user-facing or moderated content.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  PREMIUM
+  CREATOR
+  ORGANISATION
+}
+
+enum PlatformRole {
+  VIEWER
+  CREATOR
+  ORGANISATION_MEMBER
+  ADMIN
+}
+
+enum AdminSubRole {
+  SUPER_ADMIN
+  CONTENT_ADMIN
+  MODERATOR
+  SUPPORT_ADMIN
+  FINANCE_ADMIN
+  ORGANISATION_ADMIN
+}
+
+enum OrganisationRole {
+  OWNER
+  ADMIN
+  EDITOR
+  UPLOADER
+  ANALYST
+  VIEWER
+}
+
+enum OrganisationApprovalStage {
+  DRAFT
+  PENDING_EDITOR
+  PENDING_ORG_ADMIN
+  APPROVED
+  REJECTED
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+  MEMBERS_ONLY
+  ORGANISATION_ONLY
+  SCHEDULED
+}
+
+enum ContentStatus {
+  DRAFT
+  UPLOADING
+  PROCESSING
+  READY
+  PUBLISHED
+  SCHEDULED
+  UNDER_REVIEW
+  RESTRICTED
+  TAKEDOWN
+  ARCHIVED
+}
+
+enum ContentType {
+  MOVIE
+  DRAMA
+  SERIES
+  EPISODE
+  DOCUMENTARY
+  SHORT_FILM
+  AI_PRODUCTION
+  ANIMATION
+  EDUCATION
+  NEWS
+  EVENT
+  LIVE
+  PODCAST
+  MUSIC
+  COMMUNITY
+  GOVERNMENT
+  TOURISM
+  CULTURE
+  PERSONAL
+}
+
+enum ContentRating {
+  U
+  P13
+  SIXTEEN
+  EIGHTEEN
+}
+
+enum VideoSourceType {
+  PLATFORM
+  EXTERNAL
+  LIVE
+}
+
+enum ExternalProvider {
+  YOUTUBE
+  VIMEO
+  OTHER
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RESTRICTED
+  TAKEDOWN
+}
+
+enum ReportReason {
+  COPYRIGHT
+  VIOLENCE
+  SEXUAL_CONTENT
+  HATE_ABUSE
+  MISINFORMATION
+  SPAM
+  PRIVACY
+  ILLEGAL_CONTENT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ViolationSeverity {
+  WARNING
+  MINOR
+  MAJOR
+  SEVERE
+}
+
+enum UploadSessionStatus {
+  INITIATED
+  UPLOADING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+}
+
+enum NotificationEventType {
+  NEW_EPISODE
+  CHANNEL_UPLOAD
+  LIVE_STARTING
+  CREATOR_FOLLOWED
+  CONTENT_APPROVED
+  CONTENT_REJECTED
+  MODERATION_NOTICE
+  ACCOUNT_NOTICE
+}
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
+enum StorageAssetKind {
+  MASTER
+  TRANSCODED_RENDITION
+  PREVIEW
+  THUMBNAIL
+  SUBTITLE
+  VAULT
+  TEMPORARY
+}
+
+enum AnalyticsEventType {
+  VIDEO_IMPRESSION
+  VIDEO_PLAY
+  VIDEO_PAUSE
+  VIDEO_COMPLETE
+  WATCH_PROGRESS
+  PREVIEW_PLAY
+  SEARCH
+  CHANNEL_SUBSCRIBE
+  ADD_TO_WATCHLIST
+  CONTENT_LIKE
+}
+
+enum HomepageAlgorithm {
+  MANUAL
+  TRENDING
+  NEWEST
+  CONTINUE_WATCHING
+  RECOMMENDED
+  BY_CATEGORY
+  BY_GENRE
+  FOLLOWED_CHANNELS
+  LIVE_NOW
+}
+
+// ============================================================================
+// IDENTITY & ACCESS
+// ============================================================================
+
+model User {
+  id               String           @id @default(uuid())
+  email            String           @unique
+  emailVerifiedAt  DateTime?
+  passwordHash     String?
+  displayName      String
+  handle           String           @unique
+  avatarUrl        String?
+  subscriptionTier SubscriptionTier @default(FREE)
+  isSuspended      Boolean          @default(false)
+  suspendedReason  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  profile              Profile?
+  userRoles            UserRole[]
+  adminSubRoles        AdminAssignment[]
+  organisationMembers  OrganisationMember[]
+  channels             Channel[]
+  channelSubscriptions ChannelSubscription[]
+  contentAuthored      Content[]             @relation("ContentCreatedBy")
+  watchHistory         WatchHistory[]
+  watchProgress        WatchProgress[]
+  reactions            Reaction[]
+  comments             Comment[]
+  reportsFiled         Report[]              @relation("ReportsFiled")
+  violations           Violation[]
+  notifications        Notification[]
+  userSubscriptions    UserSubscription[]
+  uploadSessions       UploadSession[]
+  storageQuota         StorageQuota?
+  playlists            Playlist[]
+  deviceSessions       DeviceSession[]
+  loginHistory         LoginHistory[]
+  auditLogs            AuditLog[]            @relation("AuditActor")
+  consentRecords       ConsentRecord[]
+  vaultItems           VaultItem[]
+
+  @@index([email])
+  @@index([handle])
+}
+
+model Profile {
+  id                  String            @id @default(uuid())
+  userId              String            @unique
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio                 String?
+  preferredLanguageId String?
+  preferredLanguage   Language?         @relation(fields: [preferredLanguageId], references: [id])
+  interests           ProfileInterest[]
+  matureContentOptIn  Boolean           @default(false)
+  theme               String            @default("SYSTEM") // SYSTEM | DARK | LIGHT
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+model ProfileInterest {
+  id        String  @id @default(uuid())
+  profileId String
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  genreId   String
+  genre     Genre   @relation(fields: [genreId], references: [id])
+
+  @@unique([profileId, genreId])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique // VIEWER | CREATOR | ORGANISATION_MEMBER | ADMIN
+  description String?
+  permissions RolePermission[]
+  userRoles   UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique // e.g. "content.moderate", "homepage.curate"
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  grantedAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+}
+
+// Admin sub-role assignment, separate from the coarse platform Role so
+// SUPER_ADMIN vs MODERATOR vs FINANCE_ADMIN can be checked independently.
+model AdminAssignment {
+  id        String       @id @default(uuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subRole   AdminSubRole
+  grantedAt DateTime     @default(now())
+  grantedBy String?
+
+  @@unique([userId, subRole])
+}
+
+model DeviceSession {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName   String?
+  userAgent    String?
+  ipAddress    String?
+  lastActiveAt DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+
+  @@index([userId])
+}
+
+model LoginHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ConsentRecord {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policy    String // e.g. "privacy-policy-v1", "cookie-preferences"
+  granted   Boolean
+  createdAt DateTime @default(now())
+}
+
+// ============================================================================
+// ORGANISATIONS
+// ============================================================================
+
+model Organisation {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  type        String // Government / State Agency / University / NGO / Production House / Corporate
+  logoUrl     String?
+  bannerUrl   String?
+  brandColor  String?
+  description String?
+  isVerified  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  members  OrganisationMember[]
+  channels Channel[]
+}
+
+model OrganisationMember {
+  id             String           @id @default(uuid())
+  organisationId String
+  organisation   Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganisationRole
+  joinedAt       DateTime         @default(now())
+
+  @@unique([organisationId, userId])
+}
+
+// ============================================================================
+// CHANNELS
+// ============================================================================
+
+model Channel {
+  id             String        @id @default(uuid())
+  name           String
+  slug           String        @unique
+  ownerUserId    String?
+  ownerUser      User?         @relation(fields: [ownerUserId], references: [id])
+  organisationId String?
+  organisation   Organisation? @relation(fields: [organisationId], references: [id])
+  avatarUrl      String?
+  bannerUrl      String?
+  description    String?
+  socialLinks    Json?
+  isVerified     Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  subscriptions  ChannelSubscription[]
+  content        Content[]
+  series         Series[]
+  playlists      Playlist[]
+  uploadSessions UploadSession[]
+
+  @@index([ownerUserId])
+  @@index([organisationId])
+}
+
+enum NotificationPreference {
+  ALL
+  HIGHLIGHTS
+  NONE
+}
+
+model ChannelSubscription {
+  id        String                 @id @default(uuid())
+  channelId String
+  channel   Channel                @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notify    NotificationPreference @default(ALL)
+  createdAt DateTime               @default(now())
+
+  @@unique([channelId, userId])
+}
+
+// ============================================================================
+// TAXONOMY (admin-managed, never hardcoded)
+// ============================================================================
+
+model Category {
+  id        String    @id @default(uuid())
+  key       String    @unique
+  label     String
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  content   Content[]
+}
+
+model Genre {
+  id        String  @id @default(uuid())
+  key       String  @unique
+  label     String
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  content          ContentGenre[]
+  profileInterests ProfileInterest[]
+}
+
+model Language {
+  id           String  @id @default(uuid())
+  code         String  @unique // BCP-47 style, e.g. ms-MY, en-MY, zh-MY, ta-MY, ko-KR
+  label        String
+  isUiLanguage Boolean @default(false)
+  isActive     Boolean @default(true)
+
+  contentOriginal Content[]    @relation("ContentOriginalLanguage")
+  audioTracks     AudioTrack[]
+  subtitles       Subtitle[]
+  profiles        Profile[]
+}
+
+// ============================================================================
+// CONTENT / SERIES / EPISODES
+// ============================================================================
+
+model Series {
+  id          String    @id @default(uuid())
+  channelId   String
+  channel     Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  title       String
+  slug        String    @unique
+  description String?
+  posterUrl   String?
+  bannerUrl   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  seasons Season[]
+}
+
+model Season {
+  id           String  @id @default(uuid())
+  seriesId     String
+  series       Series  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seasonNumber Int
+  title        String?
+
+  episodes Episode[]
+
+  @@unique([seriesId, seasonNumber])
+}
+
+model Episode {
+  id            String  @id @default(uuid())
+  seasonId      String
+  season        Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  episodeNumber Int
+  contentId     String  @unique
+  content       Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, episodeNumber])
+}
+
+model Content {
+  id              String  @id @default(uuid())
+  channelId       String
+  channel         Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdByUserId String
+  createdBy       User    @relation("ContentCreatedBy", fields: [createdByUserId], references: [id])
+
+  title              String
+  slug               String        @unique
+  synopsis           String?
+  contentType        ContentType
+  categoryId         String?
+  category           Category?     @relation(fields: [categoryId], references: [id])
+  originalLanguageId String?
+  originalLanguage   Language?     @relation("ContentOriginalLanguage", fields: [originalLanguageId], references: [id])
+  rating             ContentRating @default(U)
+  releaseYear        Int?
+  durationSeconds    Int?
+  posterUrl          String?
+  bannerUrl          String?
+
+  visibility  Visibility    @default(PRIVATE)
+  status      ContentStatus @default(DRAFT)
+  scheduledAt DateTime?
+  publishedAt DateTime?
+
+  // Moderation declarations (Section 22)
+  ownsContent           Boolean @default(false)
+  authorisedToPublish   Boolean @default(false)
+  isAiGenerated         Boolean @default(false)
+  containsPaidPromotion Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  genres          ContentGenre[]
+  videoAssets     VideoAsset[]
+  episode         Episode?
+  watchHistory    WatchHistory[]
+  watchProgress   WatchProgress[]
+  reactions       Reaction[]
+  comments        Comment[]
+  reports         Report[]
+  moderationCases ModerationCase[]
+  playlistItems   PlaylistItem[]
+  homepageItems   HomepageSectionItem[]
+  tickers         Ticker[]
+  vaultItem       VaultItem?
+
+  @@index([channelId])
+  @@index([status])
+  @@index([visibility])
+  @@index([contentType])
+}
+
+model ContentGenre {
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  genreId   String
+  genre     Genre   @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, genreId])
+}
+
+// ============================================================================
+// VIDEO ASSETS / SOURCES / SUBTITLES / AUDIO TRACKS
+// ============================================================================
+
+model VideoAsset {
+  id         String          @id @default(uuid())
+  contentId  String
+  content    Content         @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  sourceType VideoSourceType
+
+  // PLATFORM-hosted
+  masterStorageKey    String?
+  hlsManifestKey      String? // key of the master .m3u8 in /transcoded
+  previewStorageKey   String?
+  thumbnailStorageKey String?
+  durationSeconds     Int?
+
+  // EXTERNAL
+  externalProvider ExternalProvider?
+  externalVideoId  String?
+
+  // LIVE
+  liveStreamId String?     @unique
+  liveStream   LiveStream? @relation(fields: [liveStreamId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subtitles      Subtitle[]
+  audioTracks    AudioTrack[]
+  renditions     VideoRendition[]
+  transcodeJobs  TranscodeJob[]
+  transcriptJobs TranscriptJob[]
+
+  @@index([contentId])
+}
+
+model VideoRendition {
+  id           String     @id @default(uuid())
+  videoAssetId String
+  videoAsset   VideoAsset @relation(fields: [videoAssetId], references: [id], onDelete: Cascade)
+  resolution   String // e.g. "1080p" | "720p" | "480p" | "360p"
+  bitrateKbps  Int
+  storageKey   String
+  createdAt    DateTime   @default(now())
+
+  @@unique([videoAssetId, resolution])
+}
+
+model AudioTrack {
+  id           String     @id @default(uuid())
+  videoAssetId String
+  videoAsset   VideoAsset @relation(fields: [videoAssetId], references: [id], onDelete: Cascade)
+  languageId   String
+  language     Language   @relation(fields: [languageId], references: [id])
+  storageKey   String?
+  isDefault    Boolean    @default(false)
+
+  @@unique([videoAssetId, languageId])
+}
+
+model Subtitle {
+  id           String     @id @default(uuid())
+  videoAssetId String
+  videoAsset   VideoAsset @relation(fields: [videoAssetId], references: [id], onDelete: Cascade)
+  languageId   String
+  language     Language   @relation(fields: [languageId], references: [id])
+  format       String // SRT | VTT
+  storageKey   String
+  source       String // "UPLOADED" | "AI_GENERATED"
+  isReviewed   Boolean    @default(false) // AI subtitles must be reviewed before publish
+  isDefault    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@unique([videoAssetId, languageId])
+}
+
+model LiveStream {
+  id               String    @id @default(uuid())
+  ingestType       String // "HLS_PULL" | "EXTERNAL_EMBED" | "RTMP" (phase 2) | "SRT" (phase 2)
+  playbackUrl      String?
+  externalEmbedUrl String?
+  scheduledStart   DateTime?
+  startedAt        DateTime?
+  endedAt          DateTime?
+  isLive           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  videoAsset VideoAsset?
+}
+
+// ============================================================================
+// PLAYLISTS / WATCH HISTORY / PROGRESS / REACTIONS / COMMENTS
+// ============================================================================
+
+model Playlist {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId   String?
+  channel     Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  name        String
+  isWatchlist Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  items PlaylistItem[]
+
+  @@index([userId])
+}
+
+model PlaylistItem {
+  id         String   @id @default(uuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  contentId  String
+  content    Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  position   Int      @default(0)
+  addedAt    DateTime @default(now())
+
+  @@unique([playlistId, contentId])
+}
+
+model WatchHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  watchedAt DateTime @default(now())
+
+  @@index([userId, watchedAt])
+}
+
+// Debounced/batched progress — one row per (user, content), updated in place.
+// Never write a row per second of playback (Section 38).
+model WatchProgress {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId       String
+  content         Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  positionSeconds Int      @default(0)
+  durationSeconds Int?
+  completed       Boolean  @default(false) // true once >= completion threshold (config, default 90%)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, contentId])
+}
+
+model Reaction {
+  id        String       @id @default(uuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, contentId])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  body      String
+  isHidden  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([contentId])
+}
+
+// ============================================================================
+// MODERATION
+// ============================================================================
+
+model Report {
+  id         String       @id @default(uuid())
+  reporterId String
+  reporter   User         @relation("ReportsFiled", fields: [reporterId], references: [id])
+  contentId  String
+  content    Content      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  reason     ReportReason
+  details    String?
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+
+  moderationCase ModerationCase?
+}
+
+model ModerationCase {
+  id              String           @id @default(uuid())
+  contentId       String
+  content         Content          @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  reportId        String?          @unique
+  report          Report?          @relation(fields: [reportId], references: [id])
+  status          ModerationStatus @default(PENDING)
+  assignedAdminId String?
+  moderatorNotes  String?
+  decision        String?
+  appealStatus    String? // null | "REQUESTED" | "REVIEWED" | "UPHELD" | "OVERTURNED"
+  createdAt       DateTime         @default(now())
+  resolvedAt      DateTime?
+
+  violations Violation[]
+
+  @@index([status])
+}
+
+model Violation {
+  id               String            @id @default(uuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moderationCaseId String?
+  moderationCase   ModerationCase?   @relation(fields: [moderationCaseId], references: [id])
+  severity         ViolationSeverity
+  reason           String
+  createdAt        DateTime          @default(now())
+
+  @@index([userId])
+}
+
+// ============================================================================
+// SUBSCRIPTIONS / PAYMENTS (schema ready, billing disabled for MVP)
+// ============================================================================
+
+model SubscriptionPlan {
+  id            String           @id @default(uuid())
+  key           String           @unique // e.g. "basic-monthly", "premium-annual", "creator-pro"
+  name          String
+  tier          SubscriptionTier
+  billingPeriod String? // "MONTHLY" | "ANNUAL" | null for FREE
+  priceCents    Int              @default(0)
+  currency      String           @default("MYR")
+  isActive      Boolean          @default(false) // stays false platform-wide until billing is enabled
+  features      Json?
+
+  userSubscriptions UserSubscription[]
+}
+
+model UserSubscription {
+  id          String           @id @default(uuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        SubscriptionPlan @relation(fields: [planId], references: [id])
+  status      String           @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED | PAST_DUE
+  startedAt   DateTime         @default(now())
+  expiresAt   DateTime?
+  externalRef String? // opaque reference from a future PaymentProvider
+
+  @@index([userId])
+}
+
+// ============================================================================
+// UPLOADS / TRANSCODE / TRANSCRIPTION / STORAGE
+// ============================================================================
+
+model UploadSession {
+  id               String              @id @default(uuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId        String?
+  channel          Channel?            @relation(fields: [channelId], references: [id])
+  targetBucket     String
+  storageKey       String
+  fileName         String
+  declaredMimeType String
+  fileSizeBytes    BigInt
+  status           UploadSessionStatus @default(INITIATED)
+  createdAt        DateTime            @default(now())
+  completedAt      DateTime?
+
+  transcodeJobs TranscodeJob[]
+}
+
+model TranscodeJob {
+  id              String         @id @default(uuid())
+  uploadSessionId String?
+  uploadSession   UploadSession? @relation(fields: [uploadSessionId], references: [id])
+  videoAssetId    String
+  videoAsset      VideoAsset     @relation(fields: [videoAssetId], references: [id], onDelete: Cascade)
+  status          JobStatus      @default(QUEUED)
+  provider        String // "local-ffmpeg" | "aws-mediaconvert"
+  errorMessage    String?
+  createdAt       DateTime       @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  @@index([status])
+}
+
+model TranscriptJob {
+  id                 String     @id @default(uuid())
+  videoAssetId       String
+  videoAsset         VideoAsset @relation(fields: [videoAssetId], references: [id], onDelete: Cascade)
+  status             JobStatus  @default(QUEUED)
+  provider           String // "stub" | "aws-transcribe"
+  detectedLanguageId String?
+  rawTranscript      Json?
+  errorMessage       String?
+  createdAt          DateTime   @default(now())
+  completedAt        DateTime?
+
+  @@index([status])
+}
+
+model StorageQuota {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allocatedBytes BigInt   @default(5368709120) // 5 GiB default vault allocation
+  usedBytes      BigInt   @default(0)
+  updatedAt      DateTime @updatedAt
+}
+
+model StorageAsset {
+  id          String           @id @default(uuid())
+  kind        StorageAssetKind
+  bucket      String
+  storageKey  String
+  sizeBytes   BigInt
+  contentType String?
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime? // for /temporary lifecycle-managed objects
+
+  @@unique([bucket, storageKey])
+  @@index([kind])
+}
+
+model VaultItem {
+  id                 String    @id @default(uuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder             String    @default("/")
+  fileName           String
+  storageKey         String
+  sizeBytes          BigInt
+  tags               String[]
+  publishedContentId String?   @unique
+  publishedContent   Content?  @relation(fields: [publishedContentId], references: [id])
+  createdAt          DateTime  @default(now())
+  deletedAt          DateTime?
+
+  @@index([userId])
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id        String                @id @default(uuid())
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType NotificationEventType
+  channel   NotificationChannel   @default(IN_APP)
+  title     String
+  body      String?
+  linkUrl   String?
+  isRead    Boolean               @default(false)
+  createdAt DateTime              @default(now())
+
+  @@index([userId, isRead])
+}
+
+// ============================================================================
+// ANALYTICS (internal event architecture — Section 38)
+// ============================================================================
+
+model AnalyticsEvent {
+  id         String             @id @default(uuid())
+  eventType  AnalyticsEventType
+  userId     String?
+  contentId  String?
+  channelId  String?
+  sessionId  String?
+  metadata   Json?
+  occurredAt DateTime           @default(now())
+
+  @@index([eventType, occurredAt])
+  @@index([contentId])
+  @@index([channelId])
+}
+
+// ============================================================================
+// HOMEPAGE CURATION / TICKER (admin-configurable, never hardcoded)
+// ============================================================================
+
+model HomepageSection {
+  id         String            @id @default(uuid())
+  key        String            @unique
+  title      String
+  algorithm  HomepageAlgorithm @default(MANUAL)
+  sortOrder  Int               @default(0)
+  isVisible  Boolean           @default(true)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  filterJson Json? // params for non-manual algorithms (genre/category/language filters)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  items HomepageSectionItem[]
+}
+
+model HomepageSectionItem {
+  id        String          @id @default(uuid())
+  sectionId String
+  section   HomepageSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content         @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  position  Int             @default(0)
+
+  @@unique([sectionId, contentId])
+}
+
+model Ticker {
+  id                   String    @id @default(uuid())
+  message              String
+  destinationContentId String?
+  destinationContent   Content?  @relation(fields: [destinationContentId], references: [id])
+  priority             Int       @default(0)
+  isEnabled            Boolean   @default(true)
+  startsAt             DateTime?
+  endsAt               DateTime?
+  createdAt            DateTime  @default(now())
+}
+
+// ============================================================================
+// AUDIT / SYSTEM
+// ============================================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+  action     String // e.g. "content.takedown", "user.suspend", "homepage.section.reorder"
+  targetType String? // e.g. "Content", "User", "HomepageSection"
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+}
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique // e.g. "brand.name", "playback.completion_threshold_pct"
+  value     Json
+  updatedAt DateTime @updatedAt
+}
