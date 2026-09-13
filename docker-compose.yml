@@ -1,13 +1,26 @@
-version: "3.9"
+# Single-VM stack for LOKAL: the app, worker, and all infra on one machine.
+# `name: lokal` plus explicit container_name/volume/network prefixes below
+# guarantee this never collides with an unrelated project (e.g. a different
+# app called "ogpc") that might be running containers on the same host —
+# every resource this stack creates is namespaced "lokal-"/"lokal_", on its
+# own private network, regardless of which directory it's checked out into.
+name: lokal
 
-# Local development infrastructure for LOKAL.
-# Production replaces `minio` with AWS S3 (ap-southeast-5) and `postgres`/`redis`
-# with managed RDS/ElastiCache — the app never talks to these containers by name,
-# only through env-configured connection strings, so swapping is a config change.
+networks:
+  lokal-network:
+    name: lokal-network
+
+volumes:
+  lokal_postgres_data:
+  lokal_redis_data:
+  lokal_minio_data:
+
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: lokal-postgres
     restart: unless-stopped
+    networks: [lokal-network]
     environment:
       POSTGRES_USER: lokal
       POSTGRES_PASSWORD: lokal_dev_password
@@ -16,19 +29,33 @@ services:
       - "5432:5432"
     volumes:
       - lokal_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lokal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
+    container_name: lokal-redis
     restart: unless-stopped
+    networks: [lokal-network]
     ports:
       - "6379:6379"
     volumes:
       - lokal_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   minio:
     image: minio/minio:latest
+    container_name: lokal-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
+    networks: [lokal-network]
     environment:
       MINIO_ROOT_USER: lokal_minio
       MINIO_ROOT_PASSWORD: lokal_minio_secret
@@ -37,8 +64,49 @@ services:
       - "9001:9001"
     volumes:
       - lokal_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-volumes:
-  lokal_postgres_data:
-  lokal_redis_data:
-  lokal_minio_data:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    container_name: lokal-app
+    restart: unless-stopped
+    networks: [lokal-network]
+    env_file: .env
+    environment:
+      # Inside the compose network, infra is reached by service name, not
+      # localhost — everything else (AUTH_SECRET, feature flags, etc.)
+      # still comes from .env via env_file above.
+      DATABASE_URL: postgresql://lokal:lokal_dev_password@postgres:5432/lokal?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: lokal-worker
+    restart: unless-stopped
+    networks: [lokal-network]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://lokal:lokal_dev_password@postgres:5432/lokal?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }

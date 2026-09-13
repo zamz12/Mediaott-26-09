@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enables the minimal-footprint server bundle used by Dockerfile.
-  output: "standalone",
   // bullmq supports several optional Redis client backends; we only use
   // ioredis, so silence the harmless "module not found" warning for the
   // valkey-glide alternative it probes for at import time.

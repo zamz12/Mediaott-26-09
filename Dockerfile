@@ -1,6 +1,7 @@
-# Multi-stage production build for the LOKAL Next.js app.
-# The background worker (transcode/transcription) runs from the same image —
-# see docker-compose.yml / the `worker` service — via `node dist-worker` args.
+# Single-VM image for LOKAL. Builds one image and reuses it for both the
+# Next.js app and the background worker (only the CMD differs) — correctness
+# and simplicity over image size for the first pass; the standalone/pruned
+# variant is a later optimization once this runs cleanly end to end.
 
 FROM node:20-alpine AS base
 RUN corepack enable
@@ -16,17 +17,14 @@ COPY . .
 RUN pnpm prisma generate
 RUN pnpm build
 
-FROM base AS runner
+# --- App (Next.js server) ---------------------------------------------------
+FROM builder AS app
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
-
-USER nextjs
 EXPOSE 3000
 ENV PORT=3000
-CMD ["node", "server.js"]
+CMD ["pnpm", "start"]
+
+# --- Worker (transcode/transcription, BullMQ) -------------------------------
+FROM builder AS worker
+ENV NODE_ENV=production
+CMD ["pnpm", "worker"]
