@@ -3,11 +3,13 @@ import { isSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { assignAdminSubRoleAction, suspendUserAction, unsuspendUserAction } from "./actions";
+import { Input, Label } from "@/components/ui/input";
+import { assignAdminSubRoleAction, createUserAction, suspendUserAction, unsuspendUserAction } from "./actions";
 
 export const metadata = { title: "Users" };
 
 const ADMIN_SUB_ROLES = ["SUPER_ADMIN", "CONTENT_ADMIN", "MODERATOR", "SUPPORT_ADMIN", "FINANCE_ADMIN", "ORGANISATION_ADMIN"];
+const PLATFORM_ROLES = ["VIEWER", "CREATOR", "ADMIN"];
 
 export default async function AdminUsersPage() {
   const sessionUser = await getSessionUser();
@@ -21,6 +23,55 @@ export default async function AdminUsersPage() {
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold">Users</h1>
+
+      {sessionUser && isSuperAdmin(sessionUser) && (
+        <details className="mb-6 rounded-xl border border-[var(--color-border)] p-4">
+          <summary className="cursor-pointer text-sm font-medium">Create platform account</summary>
+          <form action={createUserAction} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="displayName">Display name</Label>
+              <Input id="displayName" name="displayName" required />
+            </div>
+            <div>
+              <Label htmlFor="handle">Handle</Label>
+              <Input id="handle" name="handle" required pattern="[a-z0-9_]+" />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" required />
+            </div>
+            <div>
+              <Label htmlFor="password">Temporary password</Label>
+              <Input id="password" name="password" type="password" minLength={10} required />
+            </div>
+            <div>
+              <Label htmlFor="role">Role</Label>
+              <select id="role" name="role" className="focus-ring h-11 w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 text-sm">
+                {PLATFORM_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="adminSubRole">Admin sub-role (if ADMIN)</Label>
+              <select id="adminSubRole" name="adminSubRole" className="focus-ring h-11 w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 text-sm">
+                <option value="">—</option>
+                {ADMIN_SUB_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit">Create account</Button>
+            </div>
+          </form>
+        </details>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="text-[var(--color-fg-muted)]">

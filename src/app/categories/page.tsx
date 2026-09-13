@@ -14,7 +14,7 @@ export default async function CategoriesPage() {
           <Link
             key={category.id}
             href={`/categories/${category.key}`}
-            className="focus-ring flex h-24 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-4 text-center font-medium hover:border-[var(--color-accent)]"
+            className="focus-ring interactive-glow flex h-24 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-4 text-center font-medium transition-transform duration-150 hover:-translate-y-0.5 hover:border-[var(--color-accent)]"
           >
             {category.label}
           </Link>

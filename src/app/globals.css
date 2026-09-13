@@ -105,3 +105,30 @@ body {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* Native <select> dropdown popups are OS/browser-rendered and ignore Tailwind
+   utility classes like bg-transparent — only explicit background-color/color
+   on <select>/<option> reliably themes the open popup list (Chrome on
+   Windows otherwise falls back to a plain white list, unreadable in dark
+   mode). Applies sitewide so every filter/settings dropdown is covered. */
+select {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-fg);
+}
+select option {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-fg);
+}
+
+/* Subtle, cheap hover feedback for anything meant to feel clickable —
+   opt-in via class rather than a blanket `a, button` rule, and skipped
+   entirely under prefers-reduced-motion (see the existing rule above). */
+.interactive-dim {
+  transition: opacity 150ms ease, transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+.interactive-dim:hover {
+  opacity: 0.85;
+}
+.interactive-glow:hover {
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 16px -4px var(--color-accent);
+}

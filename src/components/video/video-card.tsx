@@ -62,7 +62,7 @@ export function VideoCard({ data }: { data: VideoCardData }) {
   return (
     <Link
       href={`/title/${data.slug}`}
-      className="focus-ring group relative block w-full shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-bg-elevated)] transition-transform duration-200 hover:z-10 hover:scale-105"
+      className="focus-ring interactive-glow group relative block w-full shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-[var(--color-bg-elevated)] transition-transform duration-200 hover:z-10 hover:scale-105"
       onMouseEnter={startHover}
       onMouseLeave={endHover}
       onFocus={startHover}

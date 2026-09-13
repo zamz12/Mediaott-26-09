@@ -31,7 +31,7 @@ export function SiteHeader({ user, branding }: { user: SessionUser | null; brand
             <Link
               key={link.href}
               href={link.href}
-              className="focus-ring rounded-full px-3 py-2 text-[var(--color-fg-muted)] transition-colors hover:bg-white/5 hover:text-[var(--color-fg)]"
+              className="focus-ring rounded-full px-3 py-2 text-[var(--color-fg-muted)] transition-all duration-150 hover:scale-105 hover:bg-white/5 hover:text-[var(--color-fg)]"
             >
               {link.label}
             </Link>
@@ -47,7 +47,7 @@ export function SiteHeader({ user, branding }: { user: SessionUser | null; brand
           {isAdmin && (
             <Link
               href="/admin"
-              className="focus-ring rounded-full px-3 py-2 text-[var(--color-fg-muted)] transition-colors hover:bg-white/5 hover:text-[var(--color-fg)]"
+              className="focus-ring rounded-full px-3 py-2 text-[var(--color-fg-muted)] transition-all duration-150 hover:scale-105 hover:bg-white/5 hover:text-[var(--color-fg)]"
             >
               Admin
             </Link>

@@ -29,7 +29,7 @@ export function MobileBottomNav() {
             key={href}
             href={href}
             className={clsx(
-              "focus-ring flex flex-1 flex-col items-center justify-center gap-1 text-[11px]",
+              "focus-ring flex flex-1 flex-col items-center justify-center gap-1 text-[11px] transition-transform duration-100 active:scale-90",
               active ? "text-[var(--color-accent)]" : "text-[var(--color-fg-muted)]",
             )}
           >
