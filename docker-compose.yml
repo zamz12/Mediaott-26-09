@@ -117,7 +117,11 @@ services:
     environment:
       # Inside the compose network, infra is reached by service name, not
       # localhost — everything else (AUTH_SECRET, feature flags, etc.)
-      # still comes from .env via env_file above.
+      # still comes from .env via env_file above. NODE_ENV is overridden
+      # here too: .env sets "development" for the non-Docker workflow, but
+      # this container runs the production server (`next start`), which
+      # warns on a mismatched NODE_ENV.
+      NODE_ENV: production
       DATABASE_URL: postgresql://lokal:lokal_dev_password@postgres:5432/lokal?schema=public
       REDIS_URL: redis://redis:6379
       STORAGE_ENDPOINT: http://minio:9000
@@ -142,6 +146,7 @@ services:
     networks: [lokal-network]
     env_file: .env
     environment:
+      NODE_ENV: production
       DATABASE_URL: postgresql://lokal:lokal_dev_password@postgres:5432/lokal?schema=public
       REDIS_URL: redis://redis:6379
       STORAGE_ENDPOINT: http://minio:9000
