@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireSessionUser } from "@/lib/session";
 import { becomeCreator } from "@/modules/users/service";
 import { prisma } from "@/lib/prisma";
+import { signOut } from "@/lib/auth";
+
+export async function signOutAction() {
+  await signOut({ redirectTo: "/" });
+}
 
 export async function becomeCreatorAction() {
   const user = await requireSessionUser();

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Search, Clapperboard } from "lucide-react";
+import { Search, Clapperboard, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { signOutAction } from "@/app/account/actions";
 import type { SessionUser } from "@/lib/rbac";
 import type { Branding } from "@/modules/admin/branding";
 
@@ -59,9 +60,16 @@ export function SiteHeader({ user, branding }: { user: SessionUser | null; brand
         </Link>
         <ThemeToggle />
         {user ? (
-          <Link href="/account" className="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
-            {user.displayName.slice(0, 1).toUpperCase()}
-          </Link>
+          <div className="flex items-center gap-1.5">
+            <Link href="/account" className="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
+              {user.displayName.slice(0, 1).toUpperCase()}
+            </Link>
+            <form action={signOutAction}>
+              <button type="submit" aria-label="Log out" title="Log out" className="focus-ring rounded-full p-2 text-[var(--color-fg-muted)] hover:bg-white/5 hover:text-[var(--color-fg)]">
+                <LogOut size={17} />
+              </button>
+            </form>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
             <Button href="/login" variant="ghost" size="sm">

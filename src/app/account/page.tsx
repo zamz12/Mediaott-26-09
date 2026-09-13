@@ -5,7 +5,7 @@ import { getAccountOverview } from "@/modules/users/service";
 import { listLanguages } from "@/modules/catalogue/service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { becomeCreatorAction, revokeDeviceSessionAction } from "./actions";
+import { becomeCreatorAction, revokeDeviceSessionAction, signOutAction } from "./actions";
 import { LanguageForm } from "./language-form";
 
 export const metadata = { title: "Account" };
@@ -30,6 +30,11 @@ export default async function AccountPage() {
         <Badge tone="gold" className="ml-auto">
           {account.subscriptionTier}
         </Badge>
+        <form action={signOutAction}>
+          <Button type="submit" variant="ghost" size="sm">
+            Log out
+          </Button>
+        </form>
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
