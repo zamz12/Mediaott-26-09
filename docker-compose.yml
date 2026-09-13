@@ -1,9 +1,11 @@
-# Single-VM stack for LOKAL: the app, worker, and all infra on one machine.
+# Single-machine stack for LOKAL: the app, worker, and all infra together —
+# built for exactly this use case: run entirely on your own laptop, no
+# internet dependency once images are pulled, no cloud account needed.
 # `name: lokal` plus explicit container_name/volume/network prefixes below
 # guarantee this never collides with an unrelated project (e.g. a different
-# app called "ogpc") that might be running containers on the same host —
-# every resource this stack creates is namespaced "lokal-"/"lokal_", on its
-# own private network, regardless of which directory it's checked out into.
+# app you're also running) on the same machine — every resource this stack
+# creates is namespaced "lokal-"/"lokal_", on its own private network,
+# regardless of which folder it's checked out into.
 name: lokal
 
 networks:
@@ -70,6 +72,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot: creates the private buckets StorageProvider expects
+  # (Section 15) and exits. MinIO doesn't auto-create buckets, and without
+  # this the first upload/vault action would fail with "bucket not found."
+  minio-init:
+    image: minio/mc:latest
+    container_name: lokal-minio-init
+    networks: [lokal-network]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 lokal_minio lokal_minio_secret &&
+      for b in lokal-masters lokal-transcoded lokal-previews lokal-thumbnails lokal-subtitles lokal-private-vault lokal-temporary; do
+        mc mb --ignore-existing local/$$b;
+      done &&
+      echo 'buckets ready'
+      "
+    restart: "no"
+
   app:
     build:
       context: .
@@ -88,10 +109,14 @@ services:
       STORAGE_ENDPOINT: http://minio:9000
     ports:
       - "3000:3000"
+    # Applies any pending migrations on every start (safe/idempotent) before
+    # serving — so a fresh checkout needs no extra manual migrate step.
+    command: >
+      sh -c "npx prisma migrate deploy && pnpm start"
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
 
   worker:
     build:
@@ -109,4 +134,4 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }

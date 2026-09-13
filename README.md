@@ -54,7 +54,70 @@ production, local-filesystem in dev), Vitest.
 - Optional: `ffmpeg`/`ffprobe` on PATH for the local transcode worker, and a
   MinIO container for a closer-to-production storage backend
 
-## Local development
+## Run everything with Docker (recommended for one machine, no cloud needed)
+
+This runs the app, worker, PostgreSQL, Redis, and MinIO together, entirely
+on your own computer — no cloud account, no manual database install. Needs
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/
+Mac/Linux) with WSL2 enabled on Windows.
+
+1. Clone the repo and check out this branch, e.g. on Windows:
+   ```powershell
+   cd "C:\Users\<you>\Downloads"
+   git clone https://github.com/zamz12/Mediaott-26-09 "OTT Media App"
+   cd "OTT Media App"
+   git checkout claude/lokal-ott-streaming-mvp-ixkadf
+   ```
+2. Create your `.env`:
+   ```powershell
+   copy .env.example .env
+   ```
+   Open `.env` in a text editor and set `AUTH_SECRET` to any long random
+   string (it just needs to exist — for local-only use the placeholder is
+   fine, but don't reuse it if you ever deploy this publicly). Everything
+   else in `.env.example` already matches the Docker Compose service names
+   and needs no changes for this path.
+3. Build and start everything:
+   ```powershell
+   docker compose up -d --build
+   ```
+   First run downloads base images and installs dependencies inside the
+   containers, so it needs internet access **once**; after that, stopping
+   and restarting (`docker compose down` / `docker compose up -d`) works
+   fully offline against the data already in the Docker volumes.
+4. Watch it come up (optional, `Ctrl+C` to stop watching without stopping
+   the containers):
+   ```powershell
+   docker compose logs -f app
+   ```
+   Migrations run automatically on the `app` container's startup. Wait for
+   a line like `✓ Ready` / `Listening on port 3000`.
+5. Seed demo data (one-time — safe to re-run, it upserts):
+   ```powershell
+   docker compose exec app pnpm db:seed
+   ```
+6. Open **http://localhost:3000** in your browser. Demo logins (password
+   `Password123!` for all): `admin@lokal.my`, `siti@lokal.my`, `viewer@lokal.my`.
+
+**Useful commands:**
+```powershell
+docker compose ps              # see what's running
+docker compose logs -f worker  # transcode/transcription worker logs
+docker compose down            # stop everything, keep data
+docker compose down -v         # stop everything AND wipe the database/storage
+```
+
+Every container this stack creates is named `lokal-*` on its own
+`lokal-network`, and every volume is `lokal_*` — so it's safe to run
+alongside completely unrelated Docker projects on the same machine without
+any port or name collisions (as long as those other projects don't also
+claim ports 3000/5432/6379/9000/9001).
+
+Once this runs cleanly end-to-end on your machine, that's the point to talk
+about moving it to a real cloud/production environment — the same
+`docker-compose.yml`/`Dockerfile` are the starting point for that too.
+
+## Local development (without Docker)
 
 1. **Install dependencies**
 
