@@ -47,7 +47,10 @@ export async function decideModerationCase(input: ModerationDecisionInput) {
       where: { id: moderationCase.contentId },
       data: {
         status: contentStatusMap[input.decision],
-        visibility: input.decision === "APPROVED" ? "PUBLIC" : moderationCase.content.visibility,
+        // Approval preserves whatever visibility the creator already chose
+        // (PUBLIC, MEMBERS_ONLY, SUBSCRIBERS_ONLY, ...) — it must never
+        // force content that was deliberately set to a restricted
+        // visibility (e.g. REGULATORY_HOLD) into PUBLIC.
         publishedAt: input.decision === "APPROVED" ? new Date() : moderationCase.content.publishedAt,
       },
     }),

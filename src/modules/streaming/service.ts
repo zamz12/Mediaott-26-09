@@ -8,6 +8,16 @@ export class PlaybackForbiddenError extends Error {
   }
 }
 
+// Distinct from a hard forbid: the viewer just needs to click through a
+// one-time age confirmation (Section 22's rating system, applied at
+// playback rather than at browse time — the title still appears in
+// search/homepage rows like any other public content).
+export class AgeVerificationRequiredError extends PlaybackForbiddenError {
+  constructor() {
+    super("This content is restricted to viewers 18 and older.");
+  }
+}
+
 export interface PlaybackSource {
   kind: "HLS" | "EXTERNAL_YOUTUBE" | "EXTERNAL_VIMEO" | "EXTERNAL_OTHER" | "LIVE";
   manifestUrl?: string;
@@ -25,9 +35,14 @@ export interface PlaybackPayload {
   durationSeconds: number | null;
 }
 
+export interface PlaybackOptions {
+  /** Set once the viewer has clicked through the 18+ interstitial (Section 22/31). */
+  ageConfirmed?: boolean;
+}
+
 // Enforces Visibility rules server-side and issues short-lived signed URLs
 // only at request time (Section 15/17/31) — never a stored permanent URL.
-export async function getPlaybackPayload(user: SessionUser | null, slug: string): Promise<PlaybackPayload> {
+export async function getPlaybackPayload(user: SessionUser | null, slug: string, options: PlaybackOptions = {}): Promise<PlaybackPayload> {
   const content = await prisma.content.findFirst({
     where: { slug, deletedAt: null },
     include: {
@@ -41,17 +56,32 @@ export async function getPlaybackPayload(user: SessionUser | null, slug: string)
   }
 
   const isOwner = user?.id === content.createdByUserId;
+  const isAdmin = !!user?.roles.includes("ADMIN");
 
   switch (content.visibility) {
     case "PUBLIC":
     case "UNLISTED":
       break;
+    case "PUBLIC_18_PLUS":
+      if (!options.ageConfirmed) throw new AgeVerificationRequiredError();
+      break;
     case "PRIVATE":
-      if (!isOwner) throw new PlaybackForbiddenError();
+      if (!isOwner && !isAdmin) throw new PlaybackForbiddenError();
+      break;
+    case "REGULATORY_HOLD":
+      if (!isOwner && !isAdmin) throw new PlaybackForbiddenError("This content is under regulatory hold.");
       break;
     case "MEMBERS_ONLY":
       if (!user || (user.subscriptionTier === "FREE" && !isOwner)) throw new PlaybackForbiddenError("Members-only content.");
       break;
+    case "SUBSCRIBERS_ONLY": {
+      if (isOwner || isAdmin) break;
+      const subscription = user
+        ? await prisma.channelSubscription.findUnique({ where: { channelId_userId: { channelId: content.channelId, userId: user.id } } })
+        : null;
+      if (!subscription) throw new PlaybackForbiddenError("This video is for subscribers of this channel only.");
+      break;
+    }
     case "ORGANISATION_ONLY": {
       if (isOwner) break;
       const membership = content.channel.organisationId && user
@@ -107,6 +137,6 @@ export async function getPlaybackPayload(user: SessionUser | null, slug: string)
     subtitles,
     posterUrl: content.posterUrl,
     resumePositionSeconds,
-    durationSeconds: content.durationSeconds,
+    durationSeconds: asset.durationSeconds ?? content.durationSeconds,
   };
 }

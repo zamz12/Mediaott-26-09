@@ -28,8 +28,13 @@ export async function requestPlatformUpload(userId: string, channelId: string, f
 // a PLATFORM VideoAsset to a master already sitting in the `masters` bucket
 // and enqueues transcoding (Section 13). Never transcodes inline in the
 // request — that always happens in the worker process.
-export async function enqueueTranscodeForNewMaster(contentId: string, masterKey: string, uploadSessionId?: string) {
-  const asset = await attachPlatformVideoAsset(contentId, masterKey);
+export async function enqueueTranscodeForNewMaster(
+  contentId: string,
+  masterKey: string,
+  uploadSessionId?: string,
+  orientation?: "LANDSCAPE" | "PORTRAIT",
+) {
+  const asset = await attachPlatformVideoAsset(contentId, masterKey, orientation);
   await prisma.content.update({ where: { id: contentId }, data: { status: "PROCESSING" } });
 
   const transcodeJob = await prisma.transcodeJob.create({
@@ -46,10 +51,10 @@ export async function enqueueTranscodeForNewMaster(contentId: string, masterKey:
   return asset;
 }
 
-export async function confirmPlatformUpload(uploadSessionId: string, contentId: string) {
+export async function confirmPlatformUpload(uploadSessionId: string, contentId: string, orientation?: "LANDSCAPE" | "PORTRAIT") {
   const uploadSession = await prisma.uploadSession.findUniqueOrThrow({ where: { id: uploadSessionId } });
   await getStorageProvider().completeUpload("masters", uploadSession.storageKey);
   await prisma.uploadSession.update({ where: { id: uploadSession.id }, data: { status: "COMPLETED", completedAt: new Date() } });
 
-  return enqueueTranscodeForNewMaster(contentId, uploadSession.storageKey, uploadSession.id);
+  return enqueueTranscodeForNewMaster(contentId, uploadSession.storageKey, uploadSession.id, orientation);
 }

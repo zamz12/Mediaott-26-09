@@ -6,13 +6,21 @@ import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Creator Dashboard" };
 
-function Kpi({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-xl border border-[var(--color-border)] p-4">
+function Kpi({ label, value, href }: { label: string; value: string | number; href?: string }) {
+  const content = (
+    <>
       <p className="text-xs uppercase tracking-wide text-[var(--color-fg-muted)]">{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="interactive-dim interactive-glow block rounded-xl border border-[var(--color-border)] p-4">
+        {content}
+      </Link>
+    );
+  }
+  return <div className="rounded-xl border border-[var(--color-border)] p-4">{content}</div>;
 }
 
 export default async function CreatorDashboardPage() {
@@ -38,7 +46,9 @@ export default async function CreatorDashboardPage() {
         <Button href="/creator-studio/upload">Upload video</Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <Kpi label="Videos uploaded" value={dashboard.totalVideos} href="/creator-studio/content" />
+        <Kpi label="Published" value={dashboard.publishedVideos} href="/creator-studio/content" />
         <Kpi label="Total views" value={dashboard.totalViews} />
         <Kpi label="Unique viewers" value={dashboard.uniqueViewers} />
         <Kpi label="Watch hours" value={dashboard.watchHours} />

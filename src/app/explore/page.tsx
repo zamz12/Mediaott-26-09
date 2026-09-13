@@ -1,31 +1,75 @@
 import Link from "next/link";
+import type { ContentType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { VideoCard } from "@/components/video/video-card";
 import { EmptyCatalogue } from "@/components/empty-states";
 import { resolveCardMedia } from "@/modules/media/preview";
 import { listCategories, listGenres, listLanguages } from "@/modules/catalogue/service";
+import { PUBLIC_VISIBILITY_FILTER } from "@/modules/catalogue/visibility";
 import { clsx } from "clsx";
 
 export const metadata = { title: "Explore" };
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  MOVIE: "Film",
+  DRAMA: "Drama",
+  SERIES: "TV Series",
+  EPISODE: "Episode",
+  DOCUMENTARY: "Documentary",
+  SHORT_FILM: "Short film",
+  AI_PRODUCTION: "AI production",
+  ANIMATION: "Animation",
+  EDUCATION: "Education",
+  NEWS: "News",
+  EVENT: "Event",
+  LIVE: "Live",
+  PODCAST: "Podcast",
+  MUSIC: "Music",
+  COMMUNITY: "Community",
+  GOVERNMENT: "Government",
+  TOURISM: "Tourism",
+  CULTURE: "Culture",
+  PERSONAL: "Personal",
+};
 
 interface ExploreSearchParams {
   category?: string;
   genre?: string;
   language?: string;
+  type?: string;
+  year?: string;
+  country?: string;
 }
 
 export default async function ExplorePage({ searchParams }: { searchParams: Promise<ExploreSearchParams> }) {
   const params = await searchParams;
   const [categories, genres, languages] = await Promise.all([listCategories(), listGenres(), listLanguages()]);
 
+  const publishedWhere = { status: "PUBLISHED" as const, visibility: PUBLIC_VISIBILITY_FILTER, deletedAt: null };
+  const [years, countries] = await Promise.all([
+    prisma.content.findMany({
+      where: { ...publishedWhere, releaseYear: { not: null } },
+      distinct: ["releaseYear"],
+      select: { releaseYear: true },
+      orderBy: { releaseYear: "desc" },
+    }),
+    prisma.content.findMany({
+      where: { ...publishedWhere, countryCode: { not: null } },
+      distinct: ["countryCode"],
+      select: { countryCode: true },
+      orderBy: { countryCode: "asc" },
+    }),
+  ]);
+
   const items = await prisma.content.findMany({
     where: {
-      status: "PUBLISHED",
-      visibility: "PUBLIC",
-      deletedAt: null,
+      ...publishedWhere,
       ...(params.category ? { category: { key: params.category } } : {}),
       ...(params.genre ? { genres: { some: { genre: { key: params.genre } } } } : {}),
       ...(params.language ? { originalLanguage: { code: params.language } } : {}),
+      ...(params.type && params.type in CONTENT_TYPE_LABELS ? { contentType: params.type as ContentType } : {}),
+      ...(params.year ? { releaseYear: Number(params.year) } : {}),
+      ...(params.country ? { countryCode: params.country } : {}),
     },
     orderBy: { publishedAt: "desc" },
     take: 60,
@@ -48,7 +92,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     }),
   );
 
-  function filterLink(key: "category" | "genre" | "language", value?: string) {
+  function filterLink(key: "category" | "genre" | "language" | "type" | "year" | "country", value?: string) {
     const next = new URLSearchParams(params as Record<string, string>);
     if (value) next.set(key, value);
     else next.delete(key);
@@ -93,6 +137,43 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </FilterGroup>
+
+        <FilterGroup label="Type" active={params.type}>
+          <Link href={filterLink("type")} className={chip(!params.type)}>
+            All
+          </Link>
+          {Object.entries(CONTENT_TYPE_LABELS).map(([key, label]) => (
+            <Link key={key} href={filterLink("type", key)} className={chip(params.type === key)}>
+              {label}
+            </Link>
+          ))}
+        </FilterGroup>
+
+        {years.length > 0 && (
+          <FilterGroup label="Year" active={params.year}>
+            <Link href={filterLink("year")} className={chip(!params.year)}>
+              All
+            </Link>
+            {years.map((y) => (
+              <Link key={y.releaseYear} href={filterLink("year", String(y.releaseYear))} className={chip(params.year === String(y.releaseYear))}>
+                {y.releaseYear}
+              </Link>
+            ))}
+          </FilterGroup>
+        )}
+
+        {countries.length > 0 && (
+          <FilterGroup label="Country" active={params.country}>
+            <Link href={filterLink("country")} className={chip(!params.country)}>
+              All
+            </Link>
+            {countries.map((c) => (
+              <Link key={c.countryCode} href={filterLink("country", c.countryCode!)} className={chip(params.country === c.countryCode)}>
+                {c.countryCode}
+              </Link>
+            ))}
+          </FilterGroup>
+        )}
       </div>
 
       {cards.length === 0 ? (

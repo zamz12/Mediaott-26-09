@@ -5,7 +5,7 @@ import { requireSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { archiveContent, submitContentForReview, updateContentMetadata } from "@/modules/media/service";
 import { contentMetadataSchema } from "@/modules/media/schema";
-import { addManualSubtitle } from "@/modules/media/subtitles";
+import { addManualSubtitle, requestAutoSubtitle } from "@/modules/media/subtitles";
 import { assert } from "@/lib/rbac";
 
 async function assertOwnsContent(userId: string, contentId: string) {
@@ -27,6 +27,7 @@ export async function updateMetadataAction(contentId: string, formData: FormData
     originalLanguageId: formData.get("originalLanguageId") || undefined,
     rating: formData.get("rating"),
     releaseYear: formData.get("releaseYear") || undefined,
+    countryCode: formData.get("countryCode") || undefined,
     visibility: formData.get("visibility"),
     scheduledAt: formData.get("scheduledAt") || undefined,
     ownsContent: formData.get("ownsContent") === "on",
@@ -64,5 +65,12 @@ export async function addSubtitleAction(contentId: string, videoAssetId: string,
   if (!languageId || !content?.trim()) return;
 
   await addManualSubtitle(videoAssetId, languageId, format, content);
+  revalidatePath(`/creator-studio/content/${contentId}`);
+}
+
+export async function generateAutoSubtitleAction(contentId: string, videoAssetId: string) {
+  const user = await requireSessionUser();
+  await assertOwnsContent(user.id, contentId);
+  await requestAutoSubtitle(videoAssetId);
   revalidatePath(`/creator-studio/content/${contentId}`);
 }

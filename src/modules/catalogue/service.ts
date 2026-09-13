@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import type { Content, HomepageSection } from "@prisma/client";
 import type { HomepageSectionFilter } from "@/modules/admin/homepage";
+import { isPublicVisibility, PUBLIC_VISIBILITY_FILTER } from "@/modules/catalogue/visibility";
 
-const PUBLIC_WHERE = { status: "PUBLISHED" as const, visibility: "PUBLIC" as const, deletedAt: null };
+const PUBLIC_WHERE = { status: "PUBLISHED" as const, visibility: PUBLIC_VISIBILITY_FILTER, deletedAt: null };
 
 const CARD_INCLUDE = {
   channel: { select: { name: true, slug: true } },
@@ -39,7 +40,7 @@ async function resolveSectionItems(section: HomepageSection, userId?: string): P
         orderBy: { position: "asc" },
         include: { content: { include: CARD_INCLUDE } },
       });
-      return items.map((i) => i.content).filter((c) => c.status === "PUBLISHED" && c.visibility === "PUBLIC") as ContentCard[];
+      return items.map((i) => i.content).filter((c) => c.status === "PUBLISHED" && isPublicVisibility(c.visibility)) as ContentCard[];
     }
 
     case "NEWEST":

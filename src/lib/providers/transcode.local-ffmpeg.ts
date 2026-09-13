@@ -22,6 +22,33 @@ function run(cmd: string, args: string[]): Promise<void> {
   });
 }
 
+function runCapture(cmd: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args);
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (d) => (stdout += d.toString()));
+    proc.stderr.on("data", (d) => (stderr += d.toString()));
+    proc.on("error", reject);
+    proc.on("close", (code) => (code === 0 ? resolve(stdout) : reject(new Error(`${cmd} exited ${code}: ${stderr.slice(-500)}`))));
+  });
+}
+
+// Auto-calculated duration (Section 9/23) — never creator-entered.
+async function probeDurationSeconds(filePath: string): Promise<number> {
+  const stdout = await runCapture("ffprobe", [
+    "-v",
+    "error",
+    "-show_entries",
+    "format=duration",
+    "-of",
+    "default=noprint_wrappers=1:nokey=1",
+    filePath,
+  ]);
+  const seconds = Number.parseFloat(stdout.trim());
+  return Number.isFinite(seconds) ? Math.round(seconds) : 0;
+}
+
 // Shells out to a locally installed ffmpeg/ffprobe. Requires those binaries
 // on PATH — production should use AwsMediaConvertProvider instead, which has
 // no host dependency.
@@ -33,6 +60,8 @@ export class LocalFfmpegTranscodeProvider implements TranscodeProvider {
 
     const masterBuffer = await storage.getObject(input.masterBucket as "masters", input.masterKey);
     await fs.writeFile(masterPath, masterBuffer);
+
+    const durationSeconds = await probeDurationSeconds(masterPath);
 
     const renditions: TranscodeRendition[] = [];
     for (const rung of RENDITION_LADDER) {
@@ -85,7 +114,7 @@ export class LocalFfmpegTranscodeProvider implements TranscodeProvider {
       renditions,
       thumbnailKey,
       previewKey,
-      durationSeconds: 0,
+      durationSeconds,
     };
   }
 }

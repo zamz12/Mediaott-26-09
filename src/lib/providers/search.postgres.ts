@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { PUBLIC_VISIBILITY_FILTER } from "@/modules/catalogue/visibility";
 import type { SearchProvider, SearchQuery, SearchResultItem } from "./search.provider";
 
 // MVP search: PostgreSQL ILIKE across title/synopsis/channel/genre metadata.
@@ -9,7 +10,7 @@ export class PostgresSearchProvider implements SearchProvider {
     const results = await prisma.content.findMany({
       where: {
         status: "PUBLISHED",
-        visibility: "PUBLIC",
+        visibility: PUBLIC_VISIBILITY_FILTER,
         deletedAt: null,
         AND: [
           {

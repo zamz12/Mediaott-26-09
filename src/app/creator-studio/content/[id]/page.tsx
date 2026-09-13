@@ -2,17 +2,24 @@ import { notFound } from "next/navigation";
 import { requireSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { listCategories, listGenres, listLanguages } from "@/modules/catalogue/service";
+import { VISIBILITY_LABELS } from "@/modules/catalogue/visibility";
 import { listSubtitles } from "@/modules/media/subtitles";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { addSubtitleAction, archiveContentAction, submitForReviewAction, updateMetadataAction } from "./actions";
+import {
+  addSubtitleAction,
+  archiveContentAction,
+  generateAutoSubtitleAction,
+  submitForReviewAction,
+  updateMetadataAction,
+} from "./actions";
 
 const CONTENT_TYPES = [
   "MOVIE", "DRAMA", "SERIES", "EPISODE", "DOCUMENTARY", "SHORT_FILM", "AI_PRODUCTION", "ANIMATION",
   "EDUCATION", "NEWS", "EVENT", "LIVE", "PODCAST", "MUSIC", "COMMUNITY", "GOVERNMENT", "TOURISM", "CULTURE", "PERSONAL",
 ];
-const VISIBILITIES = ["PUBLIC", "UNLISTED", "PRIVATE", "MEMBERS_ONLY", "ORGANISATION_ONLY", "SCHEDULED"];
+const VISIBILITIES = Object.keys(VISIBILITY_LABELS) as (keyof typeof VISIBILITY_LABELS)[];
 const RATINGS = [
   { value: "U", label: "U — General" },
   { value: "P13", label: "P13" },
@@ -114,6 +121,11 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
         </div>
 
         <div>
+          <Label htmlFor="countryCode">Country of origin (2-letter code)</Label>
+          <Input id="countryCode" name="countryCode" maxLength={2} placeholder="MY" defaultValue={content.countryCode ?? ""} className="w-24 uppercase" />
+        </div>
+
+        <div>
           <Label>Content rating</Label>
           <div className="flex gap-3">
             {RATINGS.map((r) => (
@@ -131,7 +143,7 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
             <select id="visibility" name="visibility" defaultValue={content.visibility} className="focus-ring h-11 w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 text-sm">
               {VISIBILITIES.map((v) => (
                 <option key={v} value={v}>
-                  {v.replace("_", " ")}
+                  {VISIBILITY_LABELS[v]}
                 </option>
               ))}
             </select>
@@ -194,6 +206,12 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
             <Textarea name="content" rows={4} placeholder="Paste subtitle file contents…" required />
             <Button type="submit" size="sm">
               Upload subtitle
+            </Button>
+          </form>
+
+          <form action={generateAutoSubtitleAction.bind(null, content.id, asset.id)} className="mt-3">
+            <Button type="submit" size="sm" variant="ghost">
+              Don&rsquo;t have a subtitle file? Generate one automatically
             </Button>
           </form>
         </section>

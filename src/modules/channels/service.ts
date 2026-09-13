@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { NotificationPreference } from "@prisma/client";
+import { PUBLIC_VISIBILITY_FILTER } from "@/modules/catalogue/visibility";
 
 export async function listChannels() {
   return prisma.channel.findMany({
@@ -22,7 +23,7 @@ export async function getChannelBySlug(slug: string) {
 
 export async function listChannelContent(channelId: string) {
   return prisma.content.findMany({
-    where: { channelId, status: "PUBLISHED", visibility: "PUBLIC", deletedAt: null },
+    where: { channelId, status: "PUBLISHED", visibility: PUBLIC_VISIBILITY_FILTER, deletedAt: null },
     orderBy: { publishedAt: "desc" },
     include: {
       channel: { select: { name: true, slug: true } },

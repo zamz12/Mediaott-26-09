@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import type { AnalyticsEventType, Prisma } from "@prisma/client";
 
 export interface CreatorDashboard {
+  totalVideos: number;
+  publishedVideos: number;
   totalViews: number;
   uniqueViewers: number;
   watchHours: number;
@@ -10,15 +12,25 @@ export interface CreatorDashboard {
   topVideos: { contentId: string; title: string; slug: string; views: number }[];
 }
 
+// Views-clocking mechanism (Section 38): every playback start already logs a
+// VIDEO_PLAY event (src/components/video/player.tsx); this just aggregates
+// them for display. Deliberately a simple count, not a new counter column,
+// so it stays consistent with everywhere else views are computed (creator
+// dashboard, TRENDING homepage algorithm).
+export async function getContentViewCount(contentId: string): Promise<number> {
+  return prisma.analyticsEvent.count({ where: { eventType: "VIDEO_PLAY", contentId } });
+}
+
 // Creator Studio dashboard KPIs (Section 23). Deliberately built from the
 // same AnalyticsEvent/WatchProgress tables the admin dashboard reads —
 // one internal analytics pipeline, not a bolt-on for creators.
 export async function getCreatorDashboard(channelIds: string[]): Promise<CreatorDashboard> {
   if (channelIds.length === 0) {
-    return { totalViews: 0, uniqueViewers: 0, watchHours: 0, subscribers: 0, completionRatePct: 0, topVideos: [] };
+    return { totalVideos: 0, publishedVideos: 0, totalViews: 0, uniqueViewers: 0, watchHours: 0, subscribers: 0, completionRatePct: 0, topVideos: [] };
   }
 
-  const contentIds = (await prisma.content.findMany({ where: { channelId: { in: channelIds } }, select: { id: true } })).map((c) => c.id);
+  const ownedContent = await prisma.content.findMany({ where: { channelId: { in: channelIds }, deletedAt: null }, select: { id: true, status: true } });
+  const contentIds = ownedContent.map((c) => c.id);
 
   const [viewEvents, uniqueViewerRows, progressRows, subscribers, topVideosGrouped] = await Promise.all([
     prisma.analyticsEvent.count({ where: { eventType: "VIDEO_PLAY", contentId: { in: contentIds } } }),
@@ -44,6 +56,8 @@ export async function getCreatorDashboard(channelIds: string[]): Promise<Creator
   });
 
   return {
+    totalVideos: ownedContent.length,
+    publishedVideos: ownedContent.filter((c) => c.status === "PUBLISHED").length,
     totalViews: viewEvents,
     uniqueViewers: uniqueViewerRows.length,
     watchHours: Math.round(watchHours * 10) / 10,

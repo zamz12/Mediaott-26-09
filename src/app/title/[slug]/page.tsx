@@ -5,6 +5,8 @@ import { getSessionUser } from "@/lib/session";
 import { getContentBySlug, type ContentCard } from "@/modules/catalogue/service";
 import { getReactionCounts, listComments } from "@/modules/moderation/service";
 import { isInWatchlist } from "@/modules/library/service";
+import { getContentViewCount } from "@/modules/analytics/service";
+import { isPublicVisibility, PUBLIC_VISIBILITY_FILTER } from "@/modules/catalogue/visibility";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +14,12 @@ import { ContentRail } from "@/components/rails/content-rail";
 import { toggleReactionAction, toggleWatchlistAction, submitReportAction, postCommentAction } from "./actions";
 
 const RATING_LABEL: Record<string, string> = { U: "U", P13: "P13", SIXTEEN: "16", EIGHTEEN: "18" };
+
+function formatViewCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
+}
 const REPORT_REASONS: { value: string; label: string }[] = [
   { value: "COPYRIGHT", label: "Copyright" },
   { value: "VIOLENCE", label: "Violence" },
@@ -27,16 +35,17 @@ const REPORT_REASONS: { value: string; label: string }[] = [
 export default async function TitleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [user, content] = await Promise.all([getSessionUser(), getContentBySlug(slug)]);
-  if (!content || content.status !== "PUBLISHED" || content.visibility !== "PUBLIC") notFound();
+  if (!content || content.status !== "PUBLISHED" || !isPublicVisibility(content.visibility)) notFound();
 
-  const [reactions, comments, inWatchlist, similar] = await Promise.all([
+  const [reactions, comments, inWatchlist, viewCount, similar] = await Promise.all([
     getReactionCounts(content.id),
     listComments(content.id),
     user ? isInWatchlist(user.id, content.id) : Promise.resolve(false),
+    getContentViewCount(content.id),
     prisma.content.findMany({
       where: {
         status: "PUBLISHED",
-        visibility: "PUBLIC",
+        visibility: PUBLIC_VISIBILITY_FILTER,
         id: { not: content.id },
         genres: { some: { genreId: { in: content.genres.map((g) => g.genreId) } } },
       },
@@ -64,7 +73,9 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ sl
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--color-fg-muted)]">
           <Badge tone="gold">{RATING_LABEL[content.rating]}</Badge>
           {content.releaseYear && <span>{content.releaseYear}</span>}
+          {content.countryCode && <span>{content.countryCode}</span>}
           {content.originalLanguage && <span>{content.originalLanguage.label}</span>}
+          <span>{formatViewCount(viewCount)} views</span>
           {content.genres.map((g) => (
             <Badge key={g.genreId}>{g.genre.label}</Badge>
           ))}

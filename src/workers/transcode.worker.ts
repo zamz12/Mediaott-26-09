@@ -1,7 +1,8 @@
 import { Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
-import { getRedisConnection, getTranscriptQueue, type TranscodeJobData } from "@/lib/queue";
+import { getRedisConnection, type TranscodeJobData } from "@/lib/queue";
 import { getTranscodeProviderAsync } from "@/lib/providers";
+import { requestAutoSubtitle } from "@/modules/media/subtitles";
 
 export function startTranscodeWorker() {
   return new Worker<TranscodeJobData>(
@@ -36,13 +37,16 @@ export function startTranscodeWorker() {
         ]);
 
         const asset = await prisma.videoAsset.findUniqueOrThrow({ where: { id: videoAssetId } });
-        await prisma.content.update({ where: { id: asset.contentId }, data: { status: "UNDER_REVIEW" } });
+        await prisma.content.update({
+          where: { id: asset.contentId },
+          data: { status: "UNDER_REVIEW", durationSeconds: result.durationSeconds || undefined },
+        });
         await prisma.moderationCase.create({ data: { contentId: asset.contentId, status: "PENDING" } });
 
-        const transcriptJob = await prisma.transcriptJob.create({
-          data: { videoAssetId, status: "QUEUED", provider: process.env.TRANSCRIPTION_PROVIDER ?? "stub" },
-        });
-        await getTranscriptQueue().add("transcript", { transcriptJobId: transcriptJob.id, videoAssetId });
+        // Auto-request a draft transcript so subtitles are ready to review
+        // as soon as the video is (Section 11) — a creator can also
+        // trigger this again later from the content editor.
+        await requestAutoSubtitle(videoAssetId);
       } catch (err) {
         await prisma.transcodeJob.update({
           where: { id: transcodeJobId },

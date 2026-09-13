@@ -63,6 +63,9 @@ enum Visibility {
   MEMBERS_ONLY
   ORGANISATION_ONLY
   SCHEDULED
+  SUBSCRIBERS_ONLY // channel followers only, distinct from a paid platform tier
+  PUBLIC_18_PLUS // publicly listed, but playback is gated behind an age confirmation
+  REGULATORY_HOLD // private for legal/compliance reasons — visible to owner + admin only
 }
 
 enum ContentStatus {
@@ -111,6 +114,11 @@ enum VideoSourceType {
   PLATFORM
   EXTERNAL
   LIVE
+}
+
+enum VideoOrientation {
+  LANDSCAPE // standard widescreen — TV/film/most content
+  PORTRAIT // mobile-shot vertical video
 }
 
 enum ExternalProvider {
@@ -559,6 +567,7 @@ model Content {
   originalLanguage   Language?     @relation("ContentOriginalLanguage", fields: [originalLanguageId], references: [id])
   rating             ContentRating @default(U)
   releaseYear        Int?
+  countryCode        String? // ISO 3166-1 alpha-2, e.g. "MY" — explore filter (Section 20)
   durationSeconds    Int?
   posterUrl          String?
   bannerUrl          String?
@@ -612,17 +621,18 @@ model ContentGenre {
 // ============================================================================
 
 model VideoAsset {
-  id         String          @id @default(uuid())
-  contentId  String
-  content    Content         @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  sourceType VideoSourceType
+  id          String           @id @default(uuid())
+  contentId   String
+  content     Content          @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  sourceType  VideoSourceType
+  orientation VideoOrientation @default(LANDSCAPE) // creator-selected at upload (mobile/portrait vs standard)
 
   // PLATFORM-hosted
   masterStorageKey    String?
   hlsManifestKey      String? // key of the master .m3u8 in /transcoded
   previewStorageKey   String?
   thumbnailStorageKey String?
-  durationSeconds     Int?
+  durationSeconds     Int? // auto-extracted by the transcode worker (ffprobe), not creator-entered
 
   // EXTERNAL
   externalProvider ExternalProvider?

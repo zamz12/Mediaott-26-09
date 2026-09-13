@@ -54,6 +54,7 @@ export async function updateContentMetadata(contentId: string, input: ContentMet
         originalLanguageId: input.originalLanguageId || null,
         rating: input.rating,
         releaseYear: input.releaseYear,
+        countryCode: input.countryCode || null,
         visibility: input.visibility,
         scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
         ownsContent: input.ownsContent,
@@ -72,8 +73,8 @@ export async function attachExternalVideoAsset(contentId: string, provider: "YOU
   });
 }
 
-export async function attachPlatformVideoAsset(contentId: string, masterStorageKey: string) {
-  return prisma.videoAsset.create({ data: { contentId, sourceType: "PLATFORM", masterStorageKey } });
+export async function attachPlatformVideoAsset(contentId: string, masterStorageKey: string, orientation?: "LANDSCAPE" | "PORTRAIT") {
+  return prisma.videoAsset.create({ data: { contentId, sourceType: "PLATFORM", masterStorageKey, orientation } });
 }
 
 // Moves content out of DRAFT into the moderation pipeline (Section 22).

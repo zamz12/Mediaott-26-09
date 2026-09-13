@@ -26,8 +26,8 @@ export async function requestPlatformUploadAction(contentId: string, fileName: s
   return requestPlatformUpload(user.id, content.channelId, fileName, contentType, sizeBytes);
 }
 
-export async function confirmPlatformUploadAction(contentId: string, uploadSessionId: string) {
-  await confirmPlatformUpload(uploadSessionId, contentId);
+export async function confirmPlatformUploadAction(contentId: string, uploadSessionId: string, orientation?: "LANDSCAPE" | "PORTRAIT") {
+  await confirmPlatformUpload(uploadSessionId, contentId, orientation);
 }
 
 export async function createExternalContentAction(formData: FormData) {
