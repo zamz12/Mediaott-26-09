@@ -48,8 +48,6 @@ export async function assignAdminSubRoleAction(formData: FormData) {
   revalidatePath("/admin/users");
 }
 
-export class UserCreationError extends Error {}
-
 export async function createUserAction(formData: FormData) {
   const admin = await requireSessionUser();
   assert(isSuperAdmin(admin), "Only Super Admins can create platform accounts directly.");
@@ -65,8 +63,8 @@ export async function createUserAction(formData: FormData) {
     prisma.user.findUnique({ where: { email } }),
     prisma.user.findUnique({ where: { handle } }),
   ]);
-  if (existingEmail) throw new UserCreationError("A user with this email already exists.");
-  if (existingHandle) throw new UserCreationError("This handle is already taken.");
+  if (existingEmail) throw new Error("A user with this email already exists.");
+  if (existingHandle) throw new Error("This handle is already taken.");
 
   const roleRow = await prisma.role.findUniqueOrThrow({ where: { name: role } });
   const passwordHash = await hashPassword(password);
