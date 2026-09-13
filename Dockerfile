@@ -11,6 +11,15 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# --- Tooling (one-off scripts, e.g. bucket init) -----------------------------
+# Deliberately does NOT depend on the full `builder` stage (no Next.js build,
+# no Prisma generate) — the minio-init service just needs Node + the AWS SDK
+# to run scripts/create-buckets.mjs, and building the whole app for that
+# wastes real time/memory when several images build in parallel.
+FROM deps AS tooling
+COPY scripts ./scripts
+CMD ["node", "scripts/create-buckets.mjs"]
+
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

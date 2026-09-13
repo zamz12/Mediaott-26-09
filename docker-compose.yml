@@ -78,14 +78,14 @@ services:
   # One-shot: creates the private buckets StorageProvider expects
   # (Section 15) and exits. MinIO doesn't auto-create buckets, and without
   # this the first upload/vault action would fail with "bucket not found."
-  # Uses the app's own image (Node + @aws-sdk/client-s3) rather than pulling
-  # a separate `minio/mc` image, which has become unreliable on Docker Hub
-  # since MinIO's licensing changes ("repository does not exist").
+  # Uses a lightweight image (Node + AWS SDK only, no Next.js build) rather
+  # than pulling a separate `minio/mc` image, which Docker Hub no longer
+  # serves ("repository does not exist" — MinIO moved to Quay.io).
   minio-init:
     build:
       context: .
       dockerfile: Dockerfile
-      target: app
+      target: tooling
     container_name: lokal-minio-init
     networks: [lokal-network]
     environment:
