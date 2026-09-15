@@ -4,7 +4,7 @@
 // project's own @aws-sdk/client-s3 dependency instead of pulling a separate
 // `minio/mc` image, which has become unreliable on Docker Hub since MinIO's
 // licensing changes.
-import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
+import { S3Client, CreateBucketCommand, PutBucketPolicyCommand } from "@aws-sdk/client-s3";
 
 const client = new S3Client({
   region: process.env.STORAGE_REGION ?? "ap-southeast-5",
@@ -38,6 +38,28 @@ for (const bucket of buckets) {
       process.exit(1);
     }
   }
+}
+
+// HLS is inherently multi-file (master playlist -> per-quality playlists ->
+// many segment files), each referencing the next by a bare relative
+// filename. A presigned URL's signature is tied to that one file's exact
+// path+query, and resolving a relative reference against it drops the query
+// string entirely per the URL spec — so every sub-request MinIO receives
+// for a rendition playlist or segment arrives unsigned and gets rejected,
+// even though the master manifest itself loaded fine. Playback authorization
+// (visibility/age/subscription checks) already happens server-side before
+// any URL is ever handed to a client, and object keys are unguessable ULIDs,
+// so making just this one bucket public-read is the standard, low-risk fix
+// for local/self-hosted HLS — production on AWS should front this bucket
+// with CloudFront signed cookies instead of relying on object-level ACLs.
+const transcodedBucket = process.env.STORAGE_BUCKET_TRANSCODED;
+if (transcodedBucket) {
+  const policy = {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Principal: "*", Action: ["s3:GetObject"], Resource: [`arn:aws:s3:::${transcodedBucket}/*`] }],
+  };
+  await client.send(new PutBucketPolicyCommand({ Bucket: transcodedBucket, Policy: JSON.stringify(policy) }));
+  console.log(`set public-read policy on: ${transcodedBucket}`);
 }
 
 console.log("buckets ready");
