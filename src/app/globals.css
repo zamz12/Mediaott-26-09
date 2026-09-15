@@ -132,3 +132,14 @@ select option {
 .interactive-glow:hover {
   box-shadow: 0 0 0 1px var(--color-accent), 0 0 16px -4px var(--color-accent);
 }
+
+/* Small "live" indicator for the New Today rail — cheap (opacity only, no
+   layout/paint work) and neutralised by the prefers-reduced-motion rule
+   above like every other animation on the site. */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}

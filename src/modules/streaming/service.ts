@@ -51,12 +51,17 @@ export async function getPlaybackPayload(user: SessionUser | null, slug: string,
     },
   });
 
-  if (!content || !["READY", "PUBLISHED"].includes(content.status)) {
-    throw new PlaybackForbiddenError("This video isn't available yet.");
-  }
+  if (!content) throw new PlaybackForbiddenError("This video isn't available yet.");
 
   const isOwner = user?.id === content.createdByUserId;
   const isAdmin = !!user?.roles.includes("ADMIN");
+
+  // Owners/admins can preview their own upload as soon as it has a playable
+  // source (PROCESSING/UNDER_REVIEW/etc.) — the "quick check" link from the
+  // content editor — everyone else still needs it READY/PUBLISHED.
+  if (!["READY", "PUBLISHED"].includes(content.status) && !isOwner && !isAdmin) {
+    throw new PlaybackForbiddenError("This video isn't available yet.");
+  }
 
   switch (content.visibility) {
     case "PUBLIC":

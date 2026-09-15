@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { requireSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { listCategories, listGenres, listLanguages } from "@/modules/catalogue/service";
@@ -7,6 +9,7 @@ import { listSubtitles } from "@/modules/media/subtitles";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AutoRefreshWhileProcessing } from "./processing-status";
 import {
   addSubtitleAction,
   archiveContentAction,
@@ -41,17 +44,64 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
   const asset = content.videoAssets[0];
   const subtitles = asset ? await listSubtitles(asset.id) : [];
   const selectedGenreIds = new Set(content.genres.map((g) => g.genreId));
+  const latestTranscodeJob = asset
+    ? await prisma.transcodeJob.findFirst({ where: { videoAssetId: asset.id }, orderBy: { createdAt: "desc" } })
+    : null;
 
   const boundUpdate = updateMetadataAction.bind(null, content.id);
   const boundSubmit = submitForReviewAction.bind(null, content.id);
   const boundArchive = archiveContentAction.bind(null, content.id);
 
+  const isProcessing = content.status === "PROCESSING";
+
   return (
     <div className="max-w-2xl">
+      <AutoRefreshWhileProcessing active={isProcessing} />
+
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold">{content.title}</h1>
         <Badge>{content.status.replace("_", " ")}</Badge>
       </div>
+
+      {isProcessing && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 text-sm">
+          <Loader2 size={16} className="shrink-0 animate-spin text-[var(--color-accent)]" />
+          <span>Processing your video — this can take a few minutes depending on length. This page updates automatically, no need to refresh.</span>
+        </div>
+      )}
+
+      {content.status === "DRAFT" && latestTranscodeJob?.status === "FAILED" && (
+        <div className="mb-6 flex items-start gap-2 rounded-lg border border-[var(--color-danger)] bg-[var(--color-danger)]/10 p-3 text-sm">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--color-danger)]" />
+          <span>
+            Processing failed{latestTranscodeJob.errorMessage ? `: ${latestTranscodeJob.errorMessage}` : "."} Try uploading the video again from{" "}
+            <Link href="/creator-studio/upload" className="underline">
+              Upload
+            </Link>
+            .
+          </span>
+        </div>
+      )}
+
+      {content.status === "UNDER_REVIEW" && asset?.hlsManifestKey && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-[var(--color-success)] bg-[var(--color-success)]/10 p-3 text-sm">
+          <CheckCircle2 size={16} className="shrink-0 text-[var(--color-success)]" />
+          <span>Processing complete — awaiting moderator review.</span>
+          <Link href={`/watch/${content.slug}`} className="ml-auto shrink-0 font-medium text-[var(--color-accent)] hover:underline">
+            Quick check →
+          </Link>
+        </div>
+      )}
+
+      {content.status === "PUBLISHED" && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-[var(--color-success)] bg-[var(--color-success)]/10 p-3 text-sm">
+          <CheckCircle2 size={16} className="shrink-0 text-[var(--color-success)]" />
+          <span>Live on LOKAL.</span>
+          <Link href={`/watch/${content.slug}`} className="ml-auto shrink-0 font-medium text-[var(--color-accent)] hover:underline">
+            View →
+          </Link>
+        </div>
+      )}
 
       <form action={boundUpdate} className="space-y-5">
         <div>

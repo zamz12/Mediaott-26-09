@@ -52,6 +52,15 @@ export function startTranscodeWorker() {
           where: { id: transcodeJobId },
           data: { status: "FAILED", errorMessage: err instanceof Error ? err.message : String(err), completedAt: new Date() },
         });
+
+        // Without this, Content.status stays stuck at PROCESSING forever on
+        // failure — nothing else ever moves it, so the creator sees an
+        // indefinite spinner with no indication anything went wrong. Back to
+        // DRAFT so they can see the failure (surfaced from TranscodeJob on
+        // the content editor) and re-upload.
+        const asset = await prisma.videoAsset.findUnique({ where: { id: videoAssetId } });
+        if (asset) await prisma.content.update({ where: { id: asset.contentId }, data: { status: "DRAFT" } });
+
         throw err;
       }
     },

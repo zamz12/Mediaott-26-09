@@ -179,6 +179,20 @@ export async function getHeroContent(): Promise<ContentCard | null> {
   return prisma.content.findFirst({ where: PUBLIC_WHERE, orderBy: { publishedAt: "desc" }, include: CARD_INCLUDE }) as Promise<ContentCard | null>;
 }
 
+// Auto-populated "what's new today" rail (never admin-curated, unlike
+// HomepageSection) — anything a creator publishes shows up here immediately,
+// no admin setup required. Distinct from the NEWEST section algorithm, which
+// only renders if an admin has actually added that section to the homepage.
+export async function getNewTodayContent(): Promise<ContentCard[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  return prisma.content.findMany({
+    where: { ...PUBLIC_WHERE, publishedAt: { gte: since } },
+    orderBy: { publishedAt: "desc" },
+    take: 20,
+    include: CARD_INCLUDE,
+  }) as Promise<ContentCard[]>;
+}
+
 export async function getActiveTicker() {
   const now = new Date();
   return prisma.ticker.findMany({
