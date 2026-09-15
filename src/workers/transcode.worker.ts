@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getRedisConnection, type TranscodeJobData } from "@/lib/queue";
 import { getTranscodeProviderAsync } from "@/lib/providers";
 import { requestAutoSubtitle } from "@/modules/media/subtitles";
+import { notifyContentSubmitted } from "@/modules/media/service";
 
 export function startTranscodeWorker() {
   return new Worker<TranscodeJobData>(
@@ -37,11 +38,12 @@ export function startTranscodeWorker() {
         ]);
 
         const asset = await prisma.videoAsset.findUniqueOrThrow({ where: { id: videoAssetId } });
-        await prisma.content.update({
+        const content = await prisma.content.update({
           where: { id: asset.contentId },
           data: { status: "UNDER_REVIEW", durationSeconds: result.durationSeconds || undefined },
         });
         await prisma.moderationCase.create({ data: { contentId: asset.contentId, status: "PENDING" } });
+        await notifyContentSubmitted(content);
 
         // Auto-request a draft transcript so subtitles are ready to review
         // as soon as the video is (Section 11) — a creator can also

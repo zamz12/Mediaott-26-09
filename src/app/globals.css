@@ -43,6 +43,66 @@
   }
 }
 
+/* Accent color palettes (Appearance settings) — only --color-accent/
+   -accent-strong/-gold ever change; bg/fg/border stay as the dark/light
+   theme defines them. "cyan" is the built-in default (:root above), so it
+   needs no override block. Each palette carries its own light-mode variant
+   for contrast, mirroring how [data-theme="light"] itself works. */
+html[data-palette="violet"] {
+  --color-accent: #a78bfa;
+  --color-accent-strong: #8b5cf6;
+  --color-gold: #f0b429;
+}
+html[data-palette="violet"][data-theme="light"] {
+  --color-accent: #7c3aed;
+  --color-accent-strong: #6d28d9;
+  --color-gold: #b45309;
+}
+
+html[data-palette="rose"] {
+  --color-accent: #fb7185;
+  --color-accent-strong: #f43f5e;
+  --color-gold: #f0b429;
+}
+html[data-palette="rose"][data-theme="light"] {
+  --color-accent: #e11d48;
+  --color-accent-strong: #be123c;
+  --color-gold: #b45309;
+}
+
+html[data-palette="emerald"] {
+  --color-accent: #34d399;
+  --color-accent-strong: #10b981;
+  --color-gold: #f0b429;
+}
+html[data-palette="emerald"][data-theme="light"] {
+  --color-accent: #059669;
+  --color-accent-strong: #047857;
+  --color-gold: #b45309;
+}
+
+html[data-palette="amber"] {
+  --color-accent: #fbbf24;
+  --color-accent-strong: #f59e0b;
+  --color-gold: #fb923c;
+}
+html[data-palette="amber"][data-theme="light"] {
+  --color-accent: #d97706;
+  --color-accent-strong: #b45309;
+  --color-gold: #c2410c;
+}
+
+/* Sizing (Appearance settings) — uniform CSS zoom rather than a per-
+   component rem scale, so it actually reaches icon pixel sizes (lucide
+   passes size as a raw px attribute, not rem) and the video player, not
+   just text. Supported in all current major engines (Firefox since 126). */
+html[data-ui-scale="COMPACT"] {
+  zoom: 0.9;
+}
+html[data-ui-scale="LARGE"] {
+  zoom: 1.15;
+}
+
 @theme inline {
   --color-background: var(--color-bg);
   --color-foreground: var(--color-fg);

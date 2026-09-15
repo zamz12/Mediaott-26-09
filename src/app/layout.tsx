@@ -2,11 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AppearanceProvider } from "@/components/appearance-provider";
 import { SiteHeader } from "@/components/layout/site-header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { PwaInstall } from "@/components/pwa-install";
 import { getSessionUser } from "@/lib/session";
 import { getBranding } from "@/modules/admin/branding";
+import { getAppearancePrefs } from "@/modules/users/service";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
@@ -35,20 +37,29 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [user, branding] = await Promise.all([getSessionUser(), getBranding()]);
+  const appearance = user ? await getAppearancePrefs(user.id) : { palette: "cyan", uiScale: "COMFORTABLE" };
 
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} h-full antialiased`}
+      data-palette={appearance.palette}
+      data-ui-scale={appearance.uiScale}
+      suppressHydrationWarning
+    >
       <body className="flex min-h-full flex-col bg-[var(--color-bg)] text-[var(--color-fg)]">
         <ThemeProvider>
-          <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-[var(--color-accent)] focus:p-3 focus:text-black">
-            Skip to content
-          </a>
-          <SiteHeader user={user} branding={branding} />
-          <main id="main" className="flex-1 pb-16 md:pb-0">
-            {children}
-          </main>
-          <MobileBottomNav />
-          <PwaInstall />
+          <AppearanceProvider initialPalette={appearance.palette} initialUiScale={appearance.uiScale}>
+            <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-[var(--color-accent)] focus:p-3 focus:text-black">
+              Skip to content
+            </a>
+            <SiteHeader user={user} branding={branding} />
+            <main id="main" className="flex-1 pb-16 md:pb-0">
+              {children}
+            </main>
+            <MobileBottomNav />
+            <PwaInstall />
+          </AppearanceProvider>
         </ThemeProvider>
       </body>
     </html>

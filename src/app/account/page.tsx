@@ -47,6 +47,12 @@ export default async function AccountPage() {
         <Link href="/account/vault" className="rounded-xl border border-[var(--color-border)] p-4 text-center hover:border-[var(--color-accent)]">
           Video Vault
         </Link>
+        <Link href="/account/appearance" className="rounded-xl border border-[var(--color-border)] p-4 text-center hover:border-[var(--color-accent)]">
+          Appearance
+        </Link>
+        <Link href="/messages" className="rounded-xl border border-[var(--color-border)] p-4 text-center hover:border-[var(--color-accent)]">
+          Messages
+        </Link>
         {isCreator ? (
           <Link href="/creator-studio" className="rounded-xl border border-[var(--color-gold)] p-4 text-center text-[var(--color-gold)]">
             Creator Studio

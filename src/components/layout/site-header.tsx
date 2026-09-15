@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Search, Clapperboard, LogOut } from "lucide-react";
+import { Search, Clapperboard, LogOut, MessageCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/app/account/actions";
 import type { SessionUser } from "@/lib/rbac";
@@ -61,6 +62,10 @@ export function SiteHeader({ user, branding }: { user: SessionUser | null; brand
         <ThemeToggle />
         {user ? (
           <div className="flex items-center gap-1.5">
+            <Link href="/messages" aria-label="Messages" className="focus-ring rounded-full p-2 hover:bg-white/5">
+              <MessageCircle size={18} />
+            </Link>
+            <NotificationBell />
             <Link href="/account" className="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
               {user.displayName.slice(0, 1).toUpperCase()}
             </Link>

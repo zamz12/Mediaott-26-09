@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { NotificationPreference } from "@prisma/client";
 import { PUBLIC_VISIBILITY_FILTER } from "@/modules/catalogue/visibility";
+import { getNotificationProvider } from "@/lib/providers";
 
 export async function listChannels() {
   return prisma.channel.findMany({
@@ -43,11 +44,31 @@ export async function getSubscription(userId: string, channelId: string) {
 }
 
 export async function subscribeToChannel(userId: string, channelId: string, notify: NotificationPreference = "ALL") {
-  return prisma.channelSubscription.upsert({
+  const existing = await prisma.channelSubscription.findUnique({ where: { channelId_userId: { channelId, userId } } });
+
+  const subscription = await prisma.channelSubscription.upsert({
     where: { channelId_userId: { channelId, userId } },
     update: { notify },
     create: { channelId, userId, notify },
   });
+
+  if (!existing) {
+    const [follower, channel] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } }),
+      prisma.channel.findUnique({ where: { id: channelId }, select: { ownerUserId: true, slug: true } }),
+    ]);
+    if (channel?.ownerUserId && channel.ownerUserId !== userId) {
+      await getNotificationProvider().send({
+        userId: channel.ownerUserId,
+        eventType: "CREATOR_FOLLOWED",
+        channel: "IN_APP",
+        title: `${follower?.displayName ?? "Someone"} followed your channel`,
+        linkUrl: `/channels/${channel.slug}`,
+      });
+    }
+  }
+
+  return subscription;
 }
 
 export async function unsubscribeFromChannel(userId: string, channelId: string) {

@@ -56,21 +56,28 @@ export default async function ChannelPage({
             </div>
           </div>
 
-          {user ? (
-            subscription ? (
-              <form action={unsubscribeAction.bind(null, channel.id, slug)}>
-                <Button type="submit" variant="secondary">
-                  Subscribed
-                </Button>
-              </form>
+          <div className="flex items-center gap-2">
+            {user && channel.ownerUserId && channel.ownerUserId !== user.id && (
+              <Button href={`/messages/${channel.ownerUserId}`} variant="ghost">
+                Message
+              </Button>
+            )}
+            {user ? (
+              subscription ? (
+                <form action={unsubscribeAction.bind(null, channel.id, slug)}>
+                  <Button type="submit" variant="secondary">
+                    Subscribed
+                  </Button>
+                </form>
+              ) : (
+                <form action={subscribeAction.bind(null, channel.id, slug, "ALL")}>
+                  <Button type="submit">Subscribe</Button>
+                </form>
+              )
             ) : (
-              <form action={subscribeAction.bind(null, channel.id, slug, "ALL")}>
-                <Button type="submit">Subscribe</Button>
-              </form>
-            )
-          ) : (
-            <Button href="/login">Subscribe</Button>
-          )}
+              <Button href="/login">Subscribe</Button>
+            )}
+          </div>
         </div>
 
         <nav className="mt-6 flex gap-1 border-b border-[var(--color-border)] text-sm">

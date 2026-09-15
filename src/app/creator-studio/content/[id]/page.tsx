@@ -10,6 +10,7 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { CountryPicker } from "@/components/ui/country-picker";
 import { AutoRefreshWhileProcessing } from "./processing-status";
 import {
   addSubtitleAction,
@@ -174,8 +175,8 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
         </div>
 
         <div>
-          <Label htmlFor="countryCode">Country of origin (2-letter code)</Label>
-          <Input id="countryCode" name="countryCode" maxLength={2} placeholder="MY" defaultValue={content.countryCode ?? ""} className="w-24 uppercase" />
+          <Label htmlFor="countryCode">Country of origin</Label>
+          <CountryPicker name="countryCode" defaultValue={content.countryCode} />
         </div>
 
         <div>

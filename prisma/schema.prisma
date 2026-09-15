@@ -189,6 +189,12 @@ enum NotificationEventType {
   CREATOR_FOLLOWED
   CONTENT_APPROVED
   CONTENT_REJECTED
+  CONTENT_SUBMITTED
+  CONTENT_FLAGGED
+  CONTENT_RESTRICTED
+  CONTENT_TAKEDOWN
+  VIOLATION_ISSUED
+  NEW_MESSAGE
   MODERATION_NOTICE
   ACCOUNT_NOTICE
 }
@@ -275,6 +281,8 @@ model User {
   auditLogs            AuditLog[]            @relation("AuditActor")
   consentRecords       ConsentRecord[]
   vaultItems           VaultItem[]
+  messagesSent         Message[]             @relation("MessagesSent")
+  messagesReceived     Message[]             @relation("MessagesReceived")
 
   @@index([email])
   @@index([handle])
@@ -290,6 +298,8 @@ model Profile {
   interests           ProfileInterest[]
   matureContentOptIn  Boolean           @default(false)
   theme               String            @default("SYSTEM") // SYSTEM | DARK | LIGHT
+  palette             String            @default("cyan") // accent color palette key (see PALETTES in appearance.ts)
+  uiScale             String            @default("COMFORTABLE") // COMPACT | COMFORTABLE | LARGE — icon/font/video sizing
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 }
@@ -988,6 +998,25 @@ model Notification {
   createdAt DateTime              @default(now())
 
   @@index([userId, isRead])
+}
+
+// ============================================================================
+// MESSAGING — direct messages between users who follow each other's
+// channel, or with platform admins (always reachable as a default contact).
+// ============================================================================
+
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("MessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User     @relation("MessagesReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+  body        String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId, isRead])
+  @@index([senderId, recipientId])
 }
 
 // ============================================================================

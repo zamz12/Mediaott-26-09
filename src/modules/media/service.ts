@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ulid } from "ulid";
 import { getStorageProvider } from "@/lib/providers";
+import { notifyModerators } from "@/modules/notifications/service";
 import type { ContentMetadataInput } from "./schema";
 
 function slugify(input: string) {
@@ -78,6 +79,19 @@ export async function attachPlatformVideoAsset(contentId: string, masterStorageK
   return prisma.videoAsset.create({ data: { contentId, sourceType: "PLATFORM", masterStorageKey, orientation } });
 }
 
+// Shared by both submission paths (a straight-to-review submit here, and
+// the transcode worker once processing finishes) so the moderator ping and
+// its 18+/P13 flagging logic live in exactly one place.
+export async function notifyContentSubmitted(content: { id: string; title: string; rating: string }) {
+  const isSensitiveRating = content.rating === "EIGHTEEN" || content.rating === "P13";
+  await notifyModerators({
+    eventType: isSensitiveRating ? "CONTENT_FLAGGED" : "CONTENT_SUBMITTED",
+    title: isSensitiveRating ? `⚠️ Needs review (${content.rating === "EIGHTEEN" ? "18+" : "P13"}): ${content.title}` : `New upload awaiting review: ${content.title}`,
+    body: isSensitiveRating ? "Flagged for its age rating — please review before approving." : undefined,
+    linkUrl: "/admin/moderation",
+  });
+}
+
 // Moves content out of DRAFT into the moderation pipeline (Section 22).
 // Platform uploads wait for transcoding to finish (see the transcode
 // worker), everything else goes straight to UNDER_REVIEW.
@@ -91,6 +105,7 @@ export async function submitContentForReview(contentId: string) {
 
   if (nextStatus === "UNDER_REVIEW") {
     await prisma.moderationCase.create({ data: { contentId, status: "PENDING" } });
+    await notifyContentSubmitted(content);
   }
 
   return updated;

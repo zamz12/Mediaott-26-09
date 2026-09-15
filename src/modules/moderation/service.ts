@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { ModerationStatus, ReportReason, ViolationSeverity } from "@prisma/client";
+import type { ModerationStatus, NotificationEventType, ReportReason, ViolationSeverity } from "@prisma/client";
 import { getNotificationProvider } from "@/lib/providers";
 
 export async function listModerationQueue() {
@@ -68,14 +68,37 @@ export async function decideModerationCase(input: ModerationDecisionInput) {
       : []),
   ]);
 
+  // Distinct notification per decision, rather than collapsing
+  // Restrict/Takedown/Reject into one generic "needs attention" — a creator
+  // acts very differently on a takedown than a visibility restriction.
+  const decisionCopy: Record<ModerationStatus, { eventType: NotificationEventType; title: string }> = {
+    APPROVED: { eventType: "CONTENT_APPROVED", title: "Your video was approved and is now live" },
+    RESTRICTED: { eventType: "CONTENT_RESTRICTED", title: "Your video's visibility was restricted" },
+    TAKEDOWN: { eventType: "CONTENT_TAKEDOWN", title: "Your video was taken down" },
+    REJECTED: { eventType: "CONTENT_REJECTED", title: "Your video needs attention" },
+    PENDING: { eventType: "MODERATION_NOTICE", title: "Your video is pending review" },
+  };
+  const copy = decisionCopy[input.decision];
+
   await getNotificationProvider().send({
     userId: moderationCase.content.createdByUserId,
-    eventType: input.decision === "APPROVED" ? "CONTENT_APPROVED" : "CONTENT_REJECTED",
+    eventType: copy.eventType,
     channel: "IN_APP",
-    title: input.decision === "APPROVED" ? "Your video was approved" : "Your video needs attention",
+    title: copy.title,
     body: input.moderatorNotes,
     linkUrl: `/creator-studio/content/${moderationCase.contentId}`,
   });
+
+  if (input.violationSeverity) {
+    await getNotificationProvider().send({
+      userId: moderationCase.content.createdByUserId,
+      eventType: "VIOLATION_ISSUED",
+      channel: "IN_APP",
+      title: `Violation recorded: ${input.violationSeverity.charAt(0)}${input.violationSeverity.slice(1).toLowerCase()}`,
+      body: input.moderatorNotes,
+      linkUrl: "/account",
+    });
+  }
 }
 
 // Filing a report always opens (or reuses) a ModerationCase so the admin
