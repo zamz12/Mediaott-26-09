@@ -123,6 +123,20 @@ export class LocalFfmpegTranscodeProvider implements TranscodeProvider {
       renditions.push({ resolution: rung.name, bitrateKbps: rung.bitrateKbps, storageKey: key });
       const rungContent = await fs.readFile(outPath);
       await storage.putObject("transcoded", key, rungContent, "application/vnd.apple.mpegurl");
+
+      // ffmpeg's HLS muxer writes each segment as its own .ts file next to
+      // the playlist (never inline in it) — e.g. 360p0.ts, 360p1.ts, ... —
+      // and the .m3u8 only lists their names. Without uploading these too,
+      // the manifest references files that don't exist in storage: it loads
+      // and parses fine (hls.js reports levels/duration correctly from the
+      // #EXTINF tags), but every segment fetch 404s the moment playback
+      // actually starts, so Play silently does nothing.
+      const workDirEntries = await fs.readdir(workDir);
+      const segmentFiles = workDirEntries.filter((f) => f.startsWith(rung.name) && f.endsWith(".ts"));
+      for (const segmentFile of segmentFiles) {
+        const segmentContent = await fs.readFile(path.join(workDir, segmentFile));
+        await storage.putObject("transcoded", `${input.videoAssetId}/${segmentFile}`, segmentContent, "video/mp2t");
+      }
     }
 
     const thumbPath = path.join(workDir, "thumb.jpg");
