@@ -3,7 +3,9 @@ import { requireSessionUser } from "@/lib/session";
 import { getMyChannels, listMyContent } from "@/modules/media/service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { EmptyCreatorLibrary } from "@/components/empty-states";
+import { deleteContentAction } from "./[id]/actions";
 
 export const metadata = { title: "Content" };
 
@@ -47,6 +49,16 @@ export default async function CreatorContentPage() {
                 <Link href={`/creator-studio/content/${item.id}`} className="text-sm text-[var(--color-accent)]">
                   Edit
                 </Link>
+                <form action={deleteContentAction.bind(null, item.id)}>
+                  <ConfirmSubmitButton
+                    variant="ghost"
+                    size="sm"
+                    className="!h-auto !px-0 text-[var(--color-danger)] hover:!bg-transparent hover:underline"
+                    confirmMessage={`Delete "${item.title}" permanently? This removes the video file and cannot be undone.`}
+                  >
+                    Delete
+                  </ConfirmSubmitButton>
+                </form>
               </div>
             </li>
           ))}

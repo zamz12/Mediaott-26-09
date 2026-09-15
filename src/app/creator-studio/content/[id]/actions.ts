@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { archiveContent, submitContentForReview, updateContentMetadata } from "@/modules/media/service";
+import { archiveContent, deleteContent, submitContentForReview, updateContentMetadata } from "@/modules/media/service";
 import { contentMetadataSchema } from "@/modules/media/schema";
 import { addManualSubtitle, requestAutoSubtitle } from "@/modules/media/subtitles";
 import { assert } from "@/lib/rbac";
@@ -53,6 +54,14 @@ export async function archiveContentAction(contentId: string) {
   await assertOwnsContent(user.id, contentId);
   await archiveContent(contentId);
   revalidatePath("/creator-studio/content");
+}
+
+export async function deleteContentAction(contentId: string) {
+  const user = await requireSessionUser();
+  await assertOwnsContent(user.id, contentId);
+  await deleteContent(contentId);
+  revalidatePath("/creator-studio/content");
+  redirect("/creator-studio/content");
 }
 
 export async function addSubtitleAction(contentId: string, videoAssetId: string, formData: FormData) {

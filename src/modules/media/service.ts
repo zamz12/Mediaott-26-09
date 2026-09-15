@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ulid } from "ulid";
+import { getStorageProvider } from "@/lib/providers";
 import type { ContentMetadataInput } from "./schema";
 
 function slugify(input: string) {
@@ -105,6 +106,37 @@ export async function listMyContent(channelIds: string[]) {
 
 export async function archiveContent(contentId: string) {
   return prisma.content.update({ where: { id: contentId }, data: { status: "ARCHIVED", deletedAt: null } });
+}
+
+// Real removal, distinct from archiveContent (which just hides new plays
+// while keeping the title around/re-publishable). Soft-deletes the row —
+// every catalogue/creator-studio query already filters deletedAt: null —
+// and best-effort cleans up the underlying storage objects so a deleted
+// upload doesn't just sit there eating disk on a local single-machine
+// deployment. Each object delete is independent: a missing/already-gone key
+// must never block removing the rest or the content row itself.
+export async function deleteContent(contentId: string) {
+  const content = await prisma.content.findUniqueOrThrow({
+    where: { id: contentId },
+    include: { videoAssets: { include: { renditions: true, subtitles: true } } },
+  });
+
+  const storage = getStorageProvider();
+  const cleanup = async (bucket: Parameters<typeof storage.deleteAsset>[0], key: string | null | undefined) => {
+    if (!key) return;
+    await storage.deleteAsset(bucket, key).catch(() => {});
+  };
+
+  for (const asset of content.videoAssets) {
+    await cleanup("masters", asset.masterStorageKey);
+    await cleanup("transcoded", asset.hlsManifestKey);
+    await cleanup("thumbnails", asset.thumbnailStorageKey);
+    await cleanup("previews", asset.previewStorageKey);
+    for (const rendition of asset.renditions) await cleanup("transcoded", rendition.storageKey);
+    for (const subtitle of asset.subtitles) await cleanup("subtitles", subtitle.storageKey);
+  }
+
+  return prisma.content.update({ where: { id: contentId }, data: { deletedAt: new Date(), status: "ARCHIVED" } });
 }
 
 export async function createSeries(channelId: string, title: string, description?: string) {

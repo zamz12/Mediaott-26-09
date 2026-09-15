@@ -9,10 +9,12 @@ import { listSubtitles } from "@/modules/media/subtitles";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { AutoRefreshWhileProcessing } from "./processing-status";
 import {
   addSubtitleAction,
   archiveContentAction,
+  deleteContentAction,
   generateAutoSubtitleAction,
   submitForReviewAction,
   updateMetadataAction,
@@ -51,6 +53,7 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
   const boundUpdate = updateMetadataAction.bind(null, content.id);
   const boundSubmit = submitForReviewAction.bind(null, content.id);
   const boundArchive = archiveContentAction.bind(null, content.id);
+  const boundDelete = deleteContentAction.bind(null, content.id);
 
   const isProcessing = content.status === "PROCESSING";
 
@@ -279,6 +282,14 @@ export default async function EditContentPage({ params }: { params: Promise<{ id
           <Button type="submit" variant="ghost">
             Archive
           </Button>
+        </form>
+        <form action={boundDelete} className="ml-auto">
+          <ConfirmSubmitButton
+            variant="danger"
+            confirmMessage={`Delete "${content.title}" permanently? This removes the video file and cannot be undone.`}
+          >
+            Delete
+          </ConfirmSubmitButton>
         </form>
       </section>
     </div>
