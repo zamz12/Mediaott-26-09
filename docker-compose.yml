@@ -64,6 +64,13 @@ services:
     environment:
       MINIO_ROOT_USER: lokal_minio
       MINIO_ROOT_PASSWORD: lokal_minio_secret
+      # The browser PUTs/GETs directly to MinIO on port 9000, while the app
+      # itself is served on port 3000 — different ports means different
+      # origins to the browser, so a PUT triggers a CORS preflight. Without
+      # this, MinIO sends no CORS headers and the browser blocks the upload
+      # before it ever leaves the machine, surfacing as a generic
+      # "Network error during upload" with no useful HTTP status.
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
     ports:
       - "9000:9000"
       - "9001:9001"
