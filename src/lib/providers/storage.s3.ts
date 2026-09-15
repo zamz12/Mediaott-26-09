@@ -17,20 +17,40 @@ import type {
 // S3-compatible implementation. Points at AWS S3 in ap-southeast-5 (Malaysia)
 // in production, or MinIO locally when STORAGE_ENDPOINT is set.
 export class S3StorageProvider implements StorageProvider {
+  // Server-side operations (putObject, getObject, HeadObject for
+  // completeUpload) run inside the Docker network and use STORAGE_ENDPOINT
+  // (e.g. http://minio:9000, only resolvable by other containers).
   private client: S3Client;
+  // Signed URLs handed to the *browser* (direct upload PUT, HLS/thumbnail/
+  // subtitle playback) must instead be signed against a host the browser can
+  // actually reach — STORAGE_PUBLIC_ENDPOINT (e.g. http://localhost:9000).
+  // Reusing the internal endpoint here was the bug: the signature covers the
+  // Host header, so the URL can't just be string-replaced after signing —
+  // it has to be signed with the public endpoint's client from the start.
+  private publicClient: S3Client;
   private buckets: Record<StorageBucketName, string>;
   private defaultTtl: number;
 
   constructor() {
+    const region = process.env.STORAGE_REGION ?? "ap-southeast-5";
+    const forcePathStyle = process.env.STORAGE_FORCE_PATH_STYLE === "true";
+    const credentials = {
+      accessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "",
+      secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY ?? "",
+    };
+
     this.client = new S3Client({
-      region: process.env.STORAGE_REGION ?? "ap-southeast-5",
+      region,
       endpoint: process.env.STORAGE_ENDPOINT || undefined,
-      forcePathStyle: process.env.STORAGE_FORCE_PATH_STYLE === "true",
-      credentials: {
-        accessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "",
-        secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY ?? "",
-      },
+      forcePathStyle,
+      credentials,
     });
+
+    const publicEndpoint = process.env.STORAGE_PUBLIC_ENDPOINT || process.env.STORAGE_ENDPOINT || undefined;
+    this.publicClient =
+      publicEndpoint === (process.env.STORAGE_ENDPOINT || undefined)
+        ? this.client
+        : new S3Client({ region, endpoint: publicEndpoint, forcePathStyle, credentials });
 
     this.buckets = {
       masters: process.env.STORAGE_BUCKET_MASTERS ?? "lokal-masters",
@@ -52,7 +72,7 @@ export class S3StorageProvider implements StorageProvider {
       Key: input.key,
       ContentType: input.contentType,
     });
-    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: this.defaultTtl });
+    const uploadUrl = await getSignedUrl(this.publicClient, command, { expiresIn: this.defaultTtl });
 
     return {
       uploadUrl,
@@ -70,7 +90,7 @@ export class S3StorageProvider implements StorageProvider {
 
   async getSignedReadUrl(bucket: StorageBucketName, key: string, ttlSeconds?: number) {
     const command = new GetObjectCommand({ Bucket: this.buckets[bucket], Key: key });
-    return getSignedUrl(this.client, command, { expiresIn: ttlSeconds ?? this.defaultTtl });
+    return getSignedUrl(this.publicClient, command, { expiresIn: ttlSeconds ?? this.defaultTtl });
   }
 
   async putObject(bucket: StorageBucketName, key: string, body: Buffer | string, contentType: string) {

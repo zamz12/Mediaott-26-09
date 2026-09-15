@@ -125,6 +125,11 @@ services:
       DATABASE_URL: postgresql://lokal:lokal_dev_password@postgres:5432/lokal?schema=public
       REDIS_URL: redis://redis:6379
       STORAGE_ENDPOINT: http://minio:9000
+      # Signed upload/playback URLs go to the *browser*, which is outside the
+      # compose network and can't resolve "minio" — it reaches MinIO through
+      # the host-mapped port instead. Without this, uploads and playback both
+      # fail silently (the browser can't connect to the signed URL's host).
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
     ports:
       - "3000:3000"
     # Applies any pending migrations on every start (safe/idempotent) before

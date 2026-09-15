@@ -30,7 +30,7 @@ export function PlatformUploadWizard() {
           <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required minLength={2} />
         </div>
         <div>
-          <Label>Video type</Label>
+          <Label>Video orientation</Label>
           <div className="flex gap-3">
             <label className="flex items-center gap-1.5 text-sm">
               <input
@@ -39,7 +39,7 @@ export function PlatformUploadWizard() {
                 checked={orientation === "LANDSCAPE"}
                 onChange={() => setOrientation("LANDSCAPE")}
               />
-              Standard (landscape / TV)
+              Landscape (film / TV, widescreen)
             </label>
             <label className="flex items-center gap-1.5 text-sm">
               <input
@@ -48,9 +48,13 @@ export function PlatformUploadWizard() {
                 checked={orientation === "PORTRAIT"}
                 onChange={() => setOrientation("PORTRAIT")}
               />
-              Mobile video (portrait / shorts)
+              Mobile / portrait (shorts, vertical video)
             </label>
           </div>
+          <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
+            This only controls the player&rsquo;s aspect ratio — SD, HD and 4K quality renditions are generated
+            automatically for adaptive streaming based on your source file&rsquo;s resolution, no need to pick one.
+          </p>
         </div>
         <Button type="submit" disabled={title.trim().length < 2}>
           Continue to upload

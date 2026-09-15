@@ -10,7 +10,7 @@ export interface TranscodeInput {
 }
 
 export interface TranscodeRendition {
-  resolution: "1080p" | "720p" | "480p" | "360p";
+  resolution: "2160p" | "1080p" | "720p" | "480p" | "360p";
   bitrateKbps: number;
   storageKey: string;
 }
