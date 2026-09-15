@@ -34,6 +34,12 @@ ENV PORT=3000
 CMD ["pnpm", "start"]
 
 # --- Worker (transcode/transcription, BullMQ) -------------------------------
+# LocalFfmpegTranscodeProvider shells out to ffmpeg/ffprobe on PATH — neither
+# ships in the base node:20-alpine image, so without this every transcode
+# job fails immediately with "spawn ffmpeg/ffprobe ENOENT". Only the worker
+# needs it: the app container never transcodes, and installing here (rather
+# than in `base`) keeps that weight off the app/tooling images.
 FROM builder AS worker
+RUN apk add --no-cache ffmpeg
 ENV NODE_ENV=production
 CMD ["pnpm", "worker"]
