@@ -4,6 +4,7 @@ import { ContentRail } from "@/components/rails/content-rail";
 import { NewTodayRail } from "@/components/rails/new-today-rail";
 import { EmptyCatalogue } from "@/components/empty-states";
 import { getActiveTicker, getHeroContent, getHomepageSections, getNewTodayContent } from "@/modules/catalogue/service";
+import { resolveCardMedia } from "@/modules/media/preview";
 import { getSessionUser } from "@/lib/session";
 
 export default async function HomePage() {
@@ -14,11 +15,12 @@ export default async function HomePage() {
     getActiveTicker(),
     getNewTodayContent(),
   ]);
+  const heroMedia = hero ? await resolveCardMedia(hero) : null;
 
   return (
     <div>
       <Ticker entries={tickerEntries} />
-      {hero ? <Hero content={hero} /> : null}
+      {hero ? <Hero content={hero} resolvedThumbnailUrl={heroMedia?.thumbnailUrl} /> : null}
 
       <div className="mx-auto max-w-[1600px] pb-16 pt-4">
         <NewTodayRail items={newToday} />

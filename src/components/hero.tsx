@@ -16,12 +16,12 @@ function formatDuration(seconds: number | null) {
 // Cinematic hero banner (Section 6). Background image only in MVP — video
 // preview attaches the same previewStorageKey used by hover-preview cards,
 // muted and never autoplaying audio, falling back to artwork when absent.
-export function Hero({ content }: { content: ContentCard }) {
+export function Hero({ content, resolvedThumbnailUrl }: { content: ContentCard; resolvedThumbnailUrl?: string | null }) {
   return (
     <section className="relative h-[62vh] min-h-[420px] w-full overflow-hidden md:h-[78vh]">
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${content.bannerUrl ?? content.posterUrl ?? "/placeholder-banner.svg"})` }}
+        style={{ backgroundImage: `url(${content.bannerUrl ?? content.posterUrl ?? resolvedThumbnailUrl ?? "/placeholder-banner.svg"})` }}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/40 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-bg)]/80 via-transparent to-transparent" />

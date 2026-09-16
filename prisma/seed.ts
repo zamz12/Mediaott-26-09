@@ -1,12 +1,52 @@
 import { PrismaClient, type HomepageAlgorithm, type Prisma } from "@prisma/client";
 import * as argon2 from "argon2";
+import { readFile } from "fs/promises";
+import path from "path";
+import { getStorageProvider, getTranscodeProviderAsync } from "@/lib/providers";
 
 const prisma = new PrismaClient();
 
-// Public-domain/Creative Commons demo video (Blender Foundation's Big Buck
-// Bunny) used as a stand-in external reference so playback works end-to-end
-// in this seed data. Real creator uploads use the PLATFORM pipeline instead.
-const DEMO_YOUTUBE_ID = "aqz-KE-bpKQ";
+// Runs each demo title's bundled clip (prisma/seed-assets/*.mp4 — short,
+// generated placeholder footage, not stock/licensed video) through the real
+// PLATFORM upload + transcode pipeline, exactly like a creator's own
+// upload — real HLS renditions, a real thumbnail, and a real hover-preview
+// clip, instead of every title sharing one static poster and one external
+// video. Requires ffmpeg wherever the seed runs (the `worker` image has it;
+// `app` does not — run `pnpm db:seed` inside the worker container).
+async function ingestSeedVideo(contentId: string, videoFileName: string): Promise<number | null> {
+  const storage = getStorageProvider();
+  const buffer = await readFile(path.join(process.cwd(), "prisma", "seed-assets", videoFileName));
+  const masterKey = `seed/${contentId}/${videoFileName}`;
+  await storage.putObject("masters", masterKey, buffer, "video/mp4");
+
+  const asset = await prisma.videoAsset.create({
+    data: { contentId, sourceType: "PLATFORM", masterStorageKey: masterKey },
+  });
+
+  const provider = await getTranscodeProviderAsync();
+  const result = await provider.transcode({ videoAssetId: asset.id, masterBucket: "masters", masterKey });
+
+  await prisma.videoAsset.update({
+    where: { id: asset.id },
+    data: {
+      hlsManifestKey: result.hlsManifestKey,
+      thumbnailStorageKey: result.thumbnailKey,
+      previewStorageKey: result.previewKey,
+      durationSeconds: result.durationSeconds || undefined,
+    },
+  });
+  await Promise.all(
+    result.renditions.map((r) =>
+      prisma.videoRendition.upsert({
+        where: { videoAssetId_resolution: { videoAssetId: asset.id, resolution: r.resolution } },
+        update: { bitrateKbps: r.bitrateKbps, storageKey: r.storageKey },
+        create: { videoAssetId: asset.id, resolution: r.resolution, bitrateKbps: r.bitrateKbps, storageKey: r.storageKey },
+      }),
+    ),
+  );
+
+  return result.durationSeconds || null;
+}
 
 async function main() {
   console.log("Seeding LOKAL demo data…");
@@ -145,14 +185,14 @@ async function main() {
 
   // --- Demo content (Section 41) ---------------------------------------------------
   const contentSeeds = [
-    { title: "Jejak Melaka", slug: "jejak-melaka", channelId: channelWarisan.id, category: "culture-heritage", genres: ["history", "culture"], type: "DOCUMENTARY" as const, synopsis: "Tracing the historic trade routes and living heritage of Melaka." },
-    { title: "Cerita Dari Borneo", slug: "cerita-dari-borneo", channelId: channelBorneo.id, category: "documentary", genres: ["culture", "travel"], type: "DOCUMENTARY" as const, synopsis: "Stories from the longhouses and rainforests of Borneo." },
-    { title: "Teknologi Kita", slug: "teknologi-kita", channelId: channelSitiFilm.id, category: "education", genres: ["technology"], type: "EDUCATION" as const, synopsis: "A look at homegrown Malaysian technology innovation." },
-    { title: "Suara Komuniti", slug: "suara-komuniti", channelId: channelWarisan.id, category: "government-community", genres: ["community"], type: "COMMUNITY" as const, synopsis: "Community voices from across the nation." },
-    { title: "AI Malaysia", slug: "ai-malaysia", channelId: channelSitiFilm.id, category: "ai-productions", genres: ["ai", "technology"], type: "AI_PRODUCTION" as const, synopsis: "An AI-assisted exploration of Malaysia's future cities." },
-    { title: "Warisan Nusantara", slug: "warisan-nusantara", channelId: channelWarisan.id, category: "culture-heritage", genres: ["culture", "history"], type: "CULTURE" as const, synopsis: "Celebrating the shared heritage of the Nusantara region." },
-    { title: "Dokumentari Sungai", slug: "dokumentari-sungai", channelId: channelBorneo.id, category: "documentary", genres: ["travel", "culture"], type: "DOCUMENTARY" as const, synopsis: "Life along Malaysia's great rivers." },
-    { title: "Cerita Pendek KL", slug: "cerita-pendek-kl", channelId: channelSitiFilm.id, category: "short-films", genres: ["drama"], type: "SHORT_FILM" as const, synopsis: "A short film anthology set in Kuala Lumpur." },
+    { title: "Jejak Melaka", slug: "jejak-melaka", channelId: channelWarisan.id, category: "culture-heritage", genres: ["history", "culture"], type: "DOCUMENTARY" as const, synopsis: "Tracing the historic trade routes and living heritage of Melaka.", videoFile: "jejak-melaka.mp4", countryCode: "MY" },
+    { title: "Cerita Dari Borneo", slug: "cerita-dari-borneo", channelId: channelBorneo.id, category: "documentary", genres: ["culture", "travel"], type: "DOCUMENTARY" as const, synopsis: "Stories from the longhouses and rainforests of Borneo.", videoFile: "cerita-dari-borneo.mp4", countryCode: "MY" },
+    { title: "Teknologi Kita", slug: "teknologi-kita", channelId: channelSitiFilm.id, category: "education", genres: ["technology"], type: "EDUCATION" as const, synopsis: "A look at homegrown Malaysian technology innovation.", videoFile: "teknologi-kita.mp4", countryCode: "MY" },
+    { title: "Suara Komuniti", slug: "suara-komuniti", channelId: channelWarisan.id, category: "government-community", genres: ["community"], type: "COMMUNITY" as const, synopsis: "Community voices from across the nation.", videoFile: "suara-komuniti.mp4", countryCode: "MY" },
+    { title: "AI Malaysia", slug: "ai-malaysia", channelId: channelSitiFilm.id, category: "ai-productions", genres: ["ai", "technology"], type: "AI_PRODUCTION" as const, synopsis: "An AI-assisted exploration of Malaysia's future cities.", videoFile: "ai-malaysia.mp4", countryCode: "MY" },
+    { title: "Warisan Nusantara", slug: "warisan-nusantara", channelId: channelWarisan.id, category: "culture-heritage", genres: ["culture", "history"], type: "CULTURE" as const, synopsis: "Celebrating the shared heritage of the Nusantara region.", videoFile: "warisan-nusantara.mp4", countryCode: "ID" },
+    { title: "Dokumentari Sungai", slug: "dokumentari-sungai", channelId: channelBorneo.id, category: "documentary", genres: ["travel", "culture"], type: "DOCUMENTARY" as const, synopsis: "Life along Malaysia's great rivers.", videoFile: "dokumentari-sungai.mp4", countryCode: "MY" },
+    { title: "Cerita Pendek KL", slug: "cerita-pendek-kl", channelId: channelSitiFilm.id, category: "short-films", genres: ["drama"], type: "SHORT_FILM" as const, synopsis: "A short film anthology set in Kuala Lumpur.", videoFile: "cerita-pendek-kl.mp4", countryCode: "MY" },
   ];
 
   for (const c of contentSeeds) {
@@ -160,7 +200,12 @@ async function main() {
 
     const content = await prisma.content.upsert({
       where: { slug: c.slug },
-      update: {},
+      // Re-running seed on a deployment that already ran the old version
+      // (shared placeholder poster + one external YouTube video for every
+      // title) needs to actually clear that placeholder, not just leave it
+      // — otherwise the poster override permanently wins over the real
+      // generated thumbnail even after the video asset below is upgraded.
+      update: { posterUrl: null, bannerUrl: null, countryCode: c.countryCode },
       create: {
         channelId: c.channelId,
         createdByUserId: owner,
@@ -172,9 +217,11 @@ async function main() {
         originalLanguageId: languages["ms-MY"].id,
         rating: "U",
         releaseYear: 2025,
-        durationSeconds: 596,
-        posterUrl: "/placeholder-poster.svg",
-        bannerUrl: "/placeholder-banner.svg",
+        countryCode: c.countryCode,
+        // No posterUrl/bannerUrl override — left null so every page that
+        // renders this title falls back to the real thumbnail generated
+        // from its own video (see resolveCardMedia), instead of every
+        // seeded title sharing one static placeholder image.
         visibility: "PUBLIC",
         status: "PUBLISHED",
         publishedAt: new Date(),
@@ -186,10 +233,16 @@ async function main() {
     });
 
     const existingAsset = await prisma.videoAsset.findFirst({ where: { contentId: content.id } });
-    if (!existingAsset) {
-      await prisma.videoAsset.create({
-        data: { contentId: content.id, sourceType: "EXTERNAL", externalProvider: "YOUTUBE", externalVideoId: DEMO_YOUTUBE_ID },
-      });
+    // A real PLATFORM asset (from this version of the seed, or a genuine
+    // creator upload attached to seed content) is left untouched — only
+    // upgrade the old placeholder pattern (every title sharing one
+    // EXTERNAL/YouTube asset) so re-seeding an already-deployed instance
+    // actually replaces it instead of leaving it stuck forever.
+    if (!existingAsset || existingAsset.sourceType === "EXTERNAL") {
+      if (existingAsset) await prisma.videoAsset.delete({ where: { id: existingAsset.id } });
+      console.log(`  transcoding ${c.videoFile} for "${c.title}"…`);
+      const durationSeconds = await ingestSeedVideo(content.id, c.videoFile);
+      await prisma.content.update({ where: { id: content.id }, data: { durationSeconds } });
     }
   }
 
