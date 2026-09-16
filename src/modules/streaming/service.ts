@@ -19,7 +19,7 @@ export class AgeVerificationRequiredError extends PlaybackForbiddenError {
 }
 
 export interface PlaybackSource {
-  kind: "HLS" | "EXTERNAL_YOUTUBE" | "EXTERNAL_VIMEO" | "EXTERNAL_OTHER" | "LIVE";
+  kind: "HLS" | "EXTERNAL_YOUTUBE" | "EXTERNAL_VIMEO" | "EXTERNAL_DAILYMOTION" | "EXTERNAL_OTHER" | "LIVE";
   manifestUrl?: string;
   externalVideoId?: string;
   embedUrl?: string;
@@ -107,10 +107,19 @@ export async function getPlaybackPayload(user: SessionUser | null, slug: string,
   let source: PlaybackSource;
 
   if (asset.sourceType === "EXTERNAL") {
-    source = {
-      kind: asset.externalProvider === "YOUTUBE" ? "EXTERNAL_YOUTUBE" : asset.externalProvider === "VIMEO" ? "EXTERNAL_VIMEO" : "EXTERNAL_OTHER",
-      externalVideoId: asset.externalVideoId ?? undefined,
-    };
+    // OTHER is the odd one out: YouTube/Vimeo/Dailymotion each have a
+    // predictable embed URL built from a bare video ID, but "any other
+    // legally-embeddable source" doesn't — externalVideoId holds a full
+    // embed URL for OTHER instead (see schema.prisma comment).
+    if (asset.externalProvider === "OTHER") {
+      source = { kind: "EXTERNAL_OTHER", embedUrl: asset.externalVideoId ?? undefined };
+    } else {
+      const kindByProvider = { YOUTUBE: "EXTERNAL_YOUTUBE", VIMEO: "EXTERNAL_VIMEO", DAILYMOTION: "EXTERNAL_DAILYMOTION" } as const;
+      source = {
+        kind: kindByProvider[asset.externalProvider ?? "YOUTUBE"],
+        externalVideoId: asset.externalVideoId ?? undefined,
+      };
+    }
   } else if (asset.sourceType === "LIVE") {
     const live = asset.liveStreamId ? await prisma.liveStream.findUnique({ where: { id: asset.liveStreamId } }) : null;
     source = { kind: "LIVE", manifestUrl: live?.playbackUrl ?? undefined, embedUrl: live?.externalEmbedUrl ?? undefined };

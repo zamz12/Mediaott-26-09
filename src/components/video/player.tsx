@@ -25,34 +25,44 @@ interface PlayerProps {
   previousEpisodeHref?: string | null;
 }
 
+function IframeEmbed({ src, title }: { src: string; title: string }) {
+  return (
+    <div className="aspect-video w-full bg-black">
+      <iframe
+        className="h-full w-full"
+        src={src}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
 // Custom HLS-compatible player (Section 17). External sources render the
-// provider's own embed instead — LOKAL never re-hosts YouTube/Vimeo video.
+// provider's own embed instead — LOKAL never re-hosts YouTube/Vimeo/
+// Dailymotion video, or another platform's live channel embed.
 export function Player({ payload, nextEpisodeHref, previousEpisodeHref }: PlayerProps) {
-  if (payload.source.kind === "EXTERNAL_YOUTUBE") {
-    return (
-      <div className="aspect-video w-full bg-black">
-        <iframe
-          className="h-full w-full"
-          src={`https://www.youtube-nocookie.com/embed/${payload.source.externalVideoId}`}
-          title={payload.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-    );
+  const { source, title } = payload;
+
+  if (source.kind === "EXTERNAL_YOUTUBE") {
+    return <IframeEmbed src={`https://www.youtube-nocookie.com/embed/${source.externalVideoId}`} title={title} />;
   }
-  if (payload.source.kind === "EXTERNAL_VIMEO") {
-    return (
-      <div className="aspect-video w-full bg-black">
-        <iframe
-          className="h-full w-full"
-          src={`https://player.vimeo.com/video/${payload.source.externalVideoId}`}
-          title={payload.title}
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-    );
+  if (source.kind === "EXTERNAL_VIMEO") {
+    return <IframeEmbed src={`https://player.vimeo.com/video/${source.externalVideoId}`} title={title} />;
+  }
+  if (source.kind === "EXTERNAL_DAILYMOTION") {
+    return <IframeEmbed src={`https://www.dailymotion.com/embed/video/${source.externalVideoId}`} title={title} />;
+  }
+  // Previously fell through to HlsPlayer, which expects manifestUrl and
+  // would just silently fail to load anything — OTHER (a broadcaster's own
+  // embed link) and a LIVE channel set up as an embed (rather than an HLS
+  // pull) both need the iframe path too, not just YouTube/Vimeo/Dailymotion.
+  if (source.kind === "EXTERNAL_OTHER" && source.embedUrl) {
+    return <IframeEmbed src={source.embedUrl} title={title} />;
+  }
+  if (source.kind === "LIVE" && source.embedUrl) {
+    return <IframeEmbed src={source.embedUrl} title={title} />;
   }
 
   return <HlsPlayer payload={payload} nextEpisodeHref={nextEpisodeHref} previousEpisodeHref={previousEpisodeHref} />;

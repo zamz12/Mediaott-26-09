@@ -124,6 +124,7 @@ enum VideoOrientation {
 enum ExternalProvider {
   YOUTUBE
   VIMEO
+  DAILYMOTION
   OTHER
 }
 
@@ -644,7 +645,11 @@ model VideoAsset {
   thumbnailStorageKey String?
   durationSeconds     Int? // auto-extracted by the transcode worker (ffprobe), not creator-entered
 
-  // EXTERNAL
+  // EXTERNAL — externalVideoId holds the bare video ID for YOUTUBE/VIMEO/
+  // DAILYMOTION (each has its own predictable embed URL shape), or a full
+  // embed URL directly for OTHER (any other legally-embeddable source,
+  // e.g. an official broadcaster's own iframe embed — never a re-stream
+  // from an unlicensed aggregator).
   externalProvider ExternalProvider?
   externalVideoId  String?
 

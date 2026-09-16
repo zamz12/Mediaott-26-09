@@ -35,7 +35,9 @@ export default async function UploadPage({ searchParams }: { searchParams: Promi
       {tab === "external" && (
         <form action={createExternalContentAction} className="space-y-4">
           <p className="text-sm text-[var(--color-fg-muted)]">
-            Reference an approved external video (YouTube, Vimeo) instead of hosting the file on LOKAL.
+            Reference an approved external video (YouTube, Vimeo, Dailymotion, or another legally-embeddable source)
+            instead of hosting the file on LOKAL. Never a re-stream from an unlicensed aggregator — only the actual
+            rights holder&rsquo;s own official embed.
           </p>
           <div>
             <Label htmlFor="title">Title</Label>
@@ -46,12 +48,23 @@ export default async function UploadPage({ searchParams }: { searchParams: Promi
             <select id="provider" name="provider" className="focus-ring h-11 w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 text-sm">
               <option value="YOUTUBE">YouTube</option>
               <option value="VIMEO">Vimeo</option>
-              <option value="OTHER">Other approved provider</option>
+              <option value="DAILYMOTION">Dailymotion</option>
+              <option value="OTHER">Other (paste a full embed URL)</option>
             </select>
           </div>
           <div>
-            <Label htmlFor="externalVideoId">Video ID</Label>
-            <Input id="externalVideoId" name="externalVideoId" placeholder="e.g. dQw4w9WgXcQ" required />
+            <Label htmlFor="externalVideoId">Video ID or embed URL</Label>
+            <Input
+              id="externalVideoId"
+              name="externalVideoId"
+              placeholder="YouTube/Vimeo/Dailymotion: the video ID (e.g. dQw4w9WgXcQ). Other: the full https://… embed URL."
+              required
+            />
+            <p className="mt-1 text-xs text-[var(--color-fg-muted)]">
+              For YouTube/Vimeo/Dailymotion, paste just the video ID from the URL — not the whole link. For
+              &ldquo;Other&rdquo;, paste the complete embeddable URL (e.g. an official broadcaster&rsquo;s own live
+              embed link from their channel).
+            </p>
           </div>
           <Button type="submit">Create draft</Button>
         </form>

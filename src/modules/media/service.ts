@@ -69,7 +69,7 @@ export async function updateContentMetadata(contentId: string, input: ContentMet
   });
 }
 
-export async function attachExternalVideoAsset(contentId: string, provider: "YOUTUBE" | "VIMEO" | "OTHER", externalVideoId: string) {
+export async function attachExternalVideoAsset(contentId: string, provider: "YOUTUBE" | "VIMEO" | "DAILYMOTION" | "OTHER", externalVideoId: string) {
   return prisma.videoAsset.create({
     data: { contentId, sourceType: "EXTERNAL", externalProvider: provider, externalVideoId },
   });

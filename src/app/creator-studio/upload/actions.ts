@@ -34,7 +34,7 @@ export async function createExternalContentAction(formData: FormData) {
   const user = await requireSessionUser();
   const channel = await requireChannel(user.id);
   const title = formData.get("title") as string;
-  const provider = formData.get("provider") as "YOUTUBE" | "VIMEO" | "OTHER";
+  const provider = formData.get("provider") as "YOUTUBE" | "VIMEO" | "DAILYMOTION" | "OTHER";
   const externalVideoId = formData.get("externalVideoId") as string;
 
   const content = await createDraftContent(user.id, channel.id, title);
